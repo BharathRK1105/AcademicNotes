@@ -5,6 +5,13 @@ import { tokenStorage } from './tokenStorage';
 
 export const notesService = {
   async createNote(payload) {
+    const inferMimeType = (name = '') => {
+      const lower = String(name).toLowerCase();
+      if (lower.endsWith('.pdf')) return 'application/pdf';
+      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+      return 'application/octet-stream';
+    };
+
     const formData = new FormData();
     formData.append('title', payload.title);
     if (payload.description) {
@@ -25,10 +32,12 @@ export const notesService = {
         formData.append('file', blob, payload.file.name || 'upload-file');
       }
     } else {
+      const fileName = payload.file.name || `upload-${Date.now()}.pdf`;
+      const fileType = payload.file.mimeType || inferMimeType(fileName);
       formData.append('file', {
         uri: payload.file.uri,
-        name: payload.file.name,
-        type: payload.file.mimeType || 'application/octet-stream',
+        name: fileName,
+        type: fileType,
       });
     }
 

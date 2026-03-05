@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Academic Notes App",
+    "slug": "academic-notes-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bharath.academicnotesapp"
+    },
+    "android": {
+      "package": "com.bharath.academicnotesapp"
+    },
+    "web": {},
+    "plugins": [
+      "expo-asset",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a62f01a1-734d-4129-bf57-adc9548caf34"
+      }
+    },
+    "owner": "bharath_rk"
+  }
+}

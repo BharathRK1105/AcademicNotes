@@ -120,10 +120,26 @@ export default function UploadNotesScreen({ navigation }) {
             <StyledSelect label="Subject" value={subject} options={SUBJECTS} onChange={setSubject} />
             <StyledSelect label="Semester" value={semester} options={SEMESTERS} onChange={setSemester} />
 
-            <TouchableOpacity style={styles.secondaryButton} onPress={pickFile} activeOpacity={0.9}>
-              <Ionicons name="document-attach-outline" size={18} color={theme.colors.primary} />
-              <Text style={styles.secondaryButtonText}>{file ? 'Change File' : 'Choose PDF/JPG'}</Text>
+            <TouchableOpacity
+              style={[styles.secondaryButton, file ? styles.changeFileButton : null]}
+              onPress={pickFile}
+              activeOpacity={0.9}
+            >
+              <Ionicons
+                name="document-attach-outline"
+                size={18}
+                color={file ? theme.colors.warning : theme.colors.primary}
+              />
+              <Text style={[styles.secondaryButtonText, file ? styles.changeFileButtonText : null]}>
+                {file ? 'Change File' : 'Choose PDF/JPG'}
+              </Text>
             </TouchableOpacity>
+            {file ? (
+              <TouchableOpacity style={styles.removeFileButton} onPress={() => setFile(null)} activeOpacity={0.9}>
+                <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
+                <Text style={styles.removeFileButtonText}>Remove File</Text>
+              </TouchableOpacity>
+            ) : null}
 
             {file ? (
               <View style={styles.previewCard}>
@@ -203,6 +219,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryButtonText: { color: theme.colors.primary, fontWeight: '800' },
+  changeFileButton: {
+    borderColor: theme.colors.warning,
+    backgroundColor: '#FFF8EB',
+  },
+  changeFileButtonText: { color: theme.colors.warning },
+  removeFileButton: {
+    borderWidth: 1,
+    borderColor: '#F1B4B4',
+    backgroundColor: '#FFF2F2',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  removeFileButtonText: { color: theme.colors.error, fontWeight: '800' },
   previewCard: {
     marginTop: 12,
     borderWidth: 1,

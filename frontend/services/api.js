@@ -10,17 +10,18 @@ const expoHostUri =
   null;
 
 const expoHost = expoHostUri ? expoHostUri.split(':')[0] : null;
+const ENV_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || '').trim();
 
 const DEFAULT_BASE_URL =
   Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 
-const BASE_URL = expoHost ? `http://${expoHost}:5000/api` : DEFAULT_BASE_URL;
+const BASE_URL = ENV_BASE_URL || (expoHost ? `http://${expoHost}:5000/api` : DEFAULT_BASE_URL);
 
 let unauthorizedHandler = null;
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 60000,
 });
 
 api.interceptors.request.use(async (config) => {

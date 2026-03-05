@@ -12,7 +12,13 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/jpg'];
+const allowedMimeTypes = [
+  'application/pdf',
+  'application/octet-stream',
+  'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
+];
 const allowedExt = ['.pdf', '.jpg', '.jpeg'];
 
 const storage = multer.diskStorage({
@@ -28,9 +34,11 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
-    const mimeOk = allowedMimeTypes.includes((file.mimetype || '').toLowerCase());
+    const mime = (file.mimetype || '').toLowerCase();
+    const mimeOk = allowedMimeTypes.includes(mime);
     const extOk = allowedExt.includes(ext);
-    if (!mimeOk || !extOk) {
+    // Some Android providers send generic MIME for PDFs; extension check keeps this safe.
+    if (!extOk || (!mimeOk && mime)) {
       return cb(new Error('Only PDF, JPG, and JPEG files are allowed'));
     }
     return cb(null, true);

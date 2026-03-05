@@ -18,6 +18,14 @@ app.use(
   })
 );
 app.use(express.json());
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    const elapsed = Date.now() - startedAt;
+    console.log(`${req.method} ${req.originalUrl} -> ${res.statusCode} (${elapsed}ms)`);
+  });
+  next();
+});
 
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ message: 'API is healthy' });

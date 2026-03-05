@@ -114,14 +114,13 @@ export default function NoteCard({
         </TouchableOpacity>
       ) : null}
 
-      {showDelete ? (
+      {showDelete && canDelete ? (
         <TouchableOpacity
-          style={[styles.deleteButton, !canDelete && styles.deleteButtonDisabled]}
-          onPress={() => canDelete && onDelete && onDelete(note)}
-          disabled={!canDelete}
+          style={styles.deleteButton}
+          onPress={() => onDelete && onDelete(note)}
         >
           <Ionicons name="trash-outline" size={18} color={theme.colors.white} />
-          <Text style={styles.downloadButtonText}>{canDelete ? 'Delete' : 'No Permission'}</Text>
+          <Text style={styles.downloadButtonText}>Delete</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -269,9 +268,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  deleteButtonDisabled: {
-    backgroundColor: '#9AAABF',
   },
   downloadButtonText: {
     color: theme.colors.white,

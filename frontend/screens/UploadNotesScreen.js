@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Linking from 'expo-linking';
 import AppNotification from '../components/AppNotification';
 import StyledSelect from '../components/StyledSelect';
 import { notesService } from '../services/notesService';
@@ -57,6 +58,20 @@ export default function UploadNotesScreen({ navigation }) {
     setSubject(SUBJECTS[0]);
     setSemester(SEMESTERS[0]);
     setDepartment(DEPARTMENTS[0]);
+  };
+
+  const previewSelectedFile = async () => {
+    if (!file?.uri) return;
+    try {
+      const canOpen = await Linking.canOpenURL(file.uri);
+      if (!canOpen) {
+        showNotification('Unable to preview this file on this device.', 'error');
+        return;
+      }
+      await Linking.openURL(file.uri);
+    } catch (error) {
+      showNotification(getApiErrorMessage(error, 'Failed to open file preview.'), 'error');
+    }
   };
 
   const handleCreate = async () => {
@@ -142,13 +157,14 @@ export default function UploadNotesScreen({ navigation }) {
             ) : null}
 
             {file ? (
-              <View style={styles.previewCard}>
+              <TouchableOpacity style={styles.previewCard} onPress={previewSelectedFile} activeOpacity={0.88}>
                 <Text style={styles.previewName}>{file.name}</Text>
                 <Text style={styles.previewMeta}>
                   {(file.mimeType || '').toUpperCase()} • {Math.max(1, Math.round((file.size || 0) / 1024))} KB
                 </Text>
+                <Text style={styles.previewHint}>Tap to preview before upload</Text>
                 {(file.mimeType || '').includes('image') ? <Image source={{ uri: file.uri }} style={styles.previewImage} /> : null}
-              </View>
+              </TouchableOpacity>
             ) : null}
 
             <TouchableOpacity style={styles.button} onPress={handleCreate} disabled={loading} activeOpacity={0.9}>
@@ -248,6 +264,7 @@ const styles = StyleSheet.create({
   },
   previewName: { fontWeight: '800', color: theme.colors.textPrimary },
   previewMeta: { color: theme.colors.textSecondary, marginTop: 4, fontSize: 12 },
+  previewHint: { color: theme.colors.primary, marginTop: 8, fontSize: 12, fontWeight: '700' },
   previewImage: { width: '100%', height: 180, borderRadius: 10, marginTop: 10, backgroundColor: '#F4EFE4' },
   button: {
     marginTop: 14,

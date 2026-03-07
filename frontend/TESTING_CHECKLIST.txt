@@ -1,0 +1,125 @@
+FEATURES TESTING CHECKLIST ✓
+============================
+
+Before submitting, test all these features:
+
+AUTHENTICATION
+□ Register with valid details
+□ Try registering with invalid email
+□ Try short password (less than 6 chars) - should show error
+□ Try mismatched passwords - should show error
+□ Login with correct credentials
+□ Try login with wrong password - should show error
+□ Try login with unregistered email - should show error
+□ Toggle password visibility (eye icon)
+
+HOME SCREEN - NOTES LIST
+□ See list of notes on home screen
+□ Pull down to refresh list
+□ Each note shows: title, subject, semester, uploaded by, date
+□ Download button visible on each card
+□ Empty state shows when no notes (search with random text)
+
+SEARCH FUNCTIONALITY
+□ Search by subject name
+□ Search by semester
+□ Search by note title
+□ Search by uploader name
+□ Clear search shows all notes again
+□ "No results" message for invalid search
+
+UPLOAD NOTES
+□ Fill in note title
+□ Add description
+□ Select subject from dropdown
+□ Select semester from dropdown
+□ Tap "Choose file" button
+□ Select a PDF or DOC file
+□ File name appears after selection
+□ Upload button shows loading state
+□ Success message appears
+□ New note appears in Home list
+□ Form clears after upload
+
+DOWNLOAD NOTES
+□ Tap download button on any note
+□ Confirmation dialog appears
+□ Tap "Download" in dialog
+□ Success message shows file downloaded
+□ Message shows file name
+
+PROFILE SCREEN
+□ See user name displayed
+□ See user email displayed
+□ See department and semester
+□ Uploaded notes count shows correctly
+□ "My Uploaded Notes" section shows your notes
+□ Each uploaded note shows title and subject
+
+EDIT PROFILE
+□ Tap "Edit Profile" button
+□ Modal opens with current info
+□ Change full name
+□ Change department
+□ Change semester
+□ Tap "Save" - profile updates
+□ Tap "Cancel" - changes not saved
+□ Updated info reflects immediately
+
+LOGOUT
+□ Tap logout button
+□ Confirmation dialog appears
+□ Tap "Logout" - returns to login screen
+□ Login again to verify data persisted
+□ All previously created notes still visible
+
+DATA PERSISTENCE
+□ Close app completely
+□ Reopen app
+□ User still logged in
+□ All notes still visible
+□ Search still works
+□ Upload new note
+□ Close and reopen - note still there
+
+UI/UX CHECK
+□ No text cutoff anywhere
+□ All buttons respond to touch
+□ Smooth scrolling
+□ Icons display correctly
+□ Colors look good
+□ No overlapping text
+□ Forms are readable
+□ Error messages clear and red
+□ Loading indicators work
+
+EDGE CASES
+□ Register without filling required fields
+□ Upload without selecting file
+□ Upload without title
+□ Very long note title (truncates properly)
+□ Special characters in search
+□ Multiple rapid clicks on buttons
+
+============================
+TOTAL FEATURES TO TEST: 50+
+============================
+
+SCORING:
+✓ All checked = Excellent (A+)
+✓ 45-49 checked = Very Good (A)
+✓ 40-44 checked = Good (B+)
+✓ 35-39 checked = Satisfactory (B)
+
+TIP: Test in this order:
+1. Authentication (Register & Login)
+2. Browse Notes (Home Screen)
+3. Search Functionality
+4. Upload Notes
+5. Download Notes
+6. Profile Features
+7. Logout & Re-login
+
+============================
+Good luck with testing! 🚀
+============================

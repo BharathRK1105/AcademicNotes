@@ -1,0 +1,87 @@
+==========================================
+QUICK SETUP GUIDE - Academic Notes App
+==========================================
+
+STEP 1: INSTALL NODE.JS
+- Download from: https://nodejs.org/
+- Install LTS version (recommended)
+- Verify: Open terminal/cmd and type: node --version
+
+STEP 2: EXTRACT FILES
+- Extract all files from the zip to a folder
+- Example: C:\Projects\AcademicNotesApp or ~/Projects/AcademicNotesApp
+
+STEP 3: OPEN TERMINAL
+- Windows: Open folder, type 'cmd' in address bar
+- Mac: Right-click folder, select "New Terminal at Folder"
+
+STEP 4: INSTALL DEPENDENCIES
+Type in terminal:
+  npm install
+
+Wait for installation to complete (may take 2-5 minutes)
+
+STEP 5: START THE APP
+Type in terminal:
+  npx expo start
+
+Or:
+  npm start
+
+STEP 6: RUN ON YOUR PHONE
+- Install "Expo Go" app from Play Store (Android) or App Store (iOS)
+- Scan the QR code shown in terminal with your phone camera
+- App will open in Expo Go
+
+STEP 7: TEST THE APP
+1. Register a new account
+   - Email: test@example.com
+   - Password: test123
+   
+2. Login with your credentials
+
+3. Browse notes in Home tab
+
+4. Upload a note in Upload tab
+
+5. Check your profile in Profile tab
+
+==========================================
+TROUBLESHOOTING
+==========================================
+
+Problem: "npm is not recognized"
+Solution: Install Node.js first
+
+Problem: "Cannot find module"
+Solution: Delete node_modules folder and run: npm install
+
+Problem: Can't scan QR code
+Solution: Make sure phone and computer are on same WiFi
+Or try: npx expo start --tunnel
+
+Problem: App crashes
+Solution: Check terminal for errors, restart with: npx expo start
+
+==========================================
+FEATURES TO DEMO
+==========================================
+✓ User Registration
+✓ User Login
+✓ View Notes List
+✓ Search Notes
+✓ Upload Notes
+✓ Download Notes
+✓ User Profile
+✓ Edit Profile
+✓ Logout
+
+==========================================
+SUPPORT
+==========================================
+For help:
+- Read README.md file
+- Check Expo docs: https://docs.expo.dev/
+- Check React Native docs: https://reactnative.dev/
+
+==========================================

@@ -59,6 +59,11 @@ export default function UploadNotesScreen({ navigation }) {
     setDepartment(DEPARTMENTS[0]);
   };
 
+  const removeFile = () => {
+    setFile(null);
+    showNotification('Selected file removed.', 'info');
+  };
+
   const handleCreate = async () => {
     if (!title.trim()) {
       showNotification('Title is required.', 'error');
@@ -120,10 +125,22 @@ export default function UploadNotesScreen({ navigation }) {
             <StyledSelect label="Subject" value={subject} options={SUBJECTS} onChange={setSubject} />
             <StyledSelect label="Semester" value={semester} options={SEMESTERS} onChange={setSemester} />
 
-            <TouchableOpacity style={styles.secondaryButton} onPress={pickFile} activeOpacity={0.9}>
-              <Ionicons name="document-attach-outline" size={18} color={theme.colors.primary} />
-              <Text style={styles.secondaryButtonText}>{file ? 'Change File' : 'Choose PDF/JPG'}</Text>
-            </TouchableOpacity>
+            <View style={styles.fileActions}>
+              <TouchableOpacity style={[styles.secondaryButton, styles.fileActionButton]} onPress={pickFile} activeOpacity={0.9}>
+                <Ionicons name="document-attach-outline" size={18} color={theme.colors.primary} />
+                <Text style={styles.secondaryButtonText}>{file ? 'Change File' : 'Choose PDF/JPG'}</Text>
+              </TouchableOpacity>
+              {file ? (
+                <TouchableOpacity
+                  style={[styles.secondaryButton, styles.fileActionButton, styles.removeButton]}
+                  onPress={removeFile}
+                  activeOpacity={0.9}
+                >
+                  <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
+                  <Text style={styles.removeButtonText}>Remove File</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
             {file ? (
               <View style={styles.previewCard}>
@@ -191,6 +208,16 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   textArea: { minHeight: 90, textAlignVertical: 'top' },
+  fileActions: {
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  fileActionButton: {
+    flex: 1,
+    marginTop: 0,
+  },
   secondaryButton: {
     borderWidth: 1,
     borderColor: theme.colors.primary,
@@ -203,6 +230,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryButtonText: { color: theme.colors.primary, fontWeight: '800' },
+  removeButton: {
+    borderColor: theme.colors.error,
+    backgroundColor: '#FFF5F5',
+  },
+  removeButtonText: {
+    color: theme.colors.error,
+    fontWeight: '800',
+  },
   previewCard: {
     marginTop: 12,
     borderWidth: 1,

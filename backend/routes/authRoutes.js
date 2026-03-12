@@ -35,6 +35,13 @@ const sanitizeUser = (user) => ({
   role: user.role,
   authProvider: user.authProvider,
   createdAt: user.createdAt,
+  department: user.department || '',
+  semester: user.semester || '',
+  bio: user.bio || '',
+  interests: Array.isArray(user.interests) ? user.interests : [],
+  lastLoginAt: user.lastLoginAt || null,
+  lastDownloadedAt: user.lastDownloadedAt || null,
+  lastDownloadedNoteTitle: user.lastDownloadedNoteTitle || '',
 });
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -89,6 +96,9 @@ router.post('/admin/login', async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid admin credentials' });
     }
+
+    admin.lastLoginAt = new Date();
+    await admin.save();
 
     const token = signToken(admin._id);
     return res.status(200).json({
@@ -152,6 +162,7 @@ router.post('/google', async (req, res, next) => {
         googleId: payload.sub,
         authProvider: 'google',
         role: 'student',
+        lastLoginAt: new Date(),
       });
     } else {
       let changed = false;
@@ -166,6 +177,8 @@ router.post('/google', async (req, res, next) => {
       if (user.isBlocked) {
         return res.status(403).json({ message: 'User is blocked by admin' });
       }
+      user.lastLoginAt = new Date();
+      changed = true;
       if (changed) {
         await user.save();
       }
@@ -213,6 +226,7 @@ router.post('/register', async (req, res, next) => {
       authProvider: 'local',
       role: 'student',
       isBlocked: false,
+      lastLoginAt: new Date(),
     });
 
     const token = signToken(user._id);
@@ -258,6 +272,9 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    user.lastLoginAt = new Date();
+    await user.save();
+
     const token = signToken(user._id);
     return res.status(200).json({
       token,
@@ -274,6 +291,72 @@ router.get('/me', authMiddleware, async (req, res) => {
     user: sanitizeUser(req.user),
     role: req.user.role,
   });
+});
+
+router.patch('/me', authMiddleware, async (req, res, next) => {
+  try {
+    const { name, department, semester, bio, interests } = req.body || {};
+    const user = req.user;
+
+    if (typeof name === 'string' && name.trim()) {
+      user.name = name.trim();
+    }
+    if (typeof department === 'string') {
+      user.department = department.trim();
+    }
+    if (typeof semester === 'string') {
+      user.semester = semester.trim();
+    }
+    if (typeof bio === 'string') {
+      user.bio = bio.trim().slice(0, 300);
+    }
+    if (Array.isArray(interests)) {
+      user.interests = interests
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+        .slice(0, 10);
+    }
+
+    await user.save();
+    return res.status(200).json({
+      user: sanitizeUser(user),
+      role: user.role,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/change-password', authMiddleware, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (user.authProvider !== 'local') {
+      return res.status(400).json({ message: 'Password change is only available for local accounts' });
+    }
+
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current password and new password are required' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+    return res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 module.exports = router;

@@ -15,4 +15,9 @@ export const adminService = {
     const response = await api.patch(`/admin/users/${userId}/block`, { isBlocked });
     return response.data;
   },
+
+  async getProfileInsights() {
+    const response = await api.get('/admin/profile/insights');
+    return response.data;
+  },
 };

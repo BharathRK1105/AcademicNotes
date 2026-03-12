@@ -53,6 +53,41 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    department: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    semester: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    bio: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 300,
+    },
+    interests: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    lastDownloadedAt: {
+      type: Date,
+      default: null,
+    },
+    lastDownloadedNoteTitle: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,

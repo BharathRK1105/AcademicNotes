@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -13,6 +13,15 @@ import { DEPARTMENTS, SEMESTERS, SUBJECTS } from '../utils/constants';
 import { theme } from '../theme';
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg'];
+const MAX_BULK_FILES = 10;
+
+const getDefaultTitleFromFileName = (fileName = '') => {
+  const index = fileName.lastIndexOf('.');
+  const base = index > 0 ? fileName.slice(0, index) : fileName;
+  return String(base || 'Untitled Note').replace(/[_-]+/g, ' ').trim();
+};
+
+const getFileKey = (file) => `${file.uri || ''}|${file.name || ''}|${file.size || 0}`;
 
 export default function UploadNotesScreen({ navigation }) {
   const [title, setTitle] = useState('');
@@ -20,7 +29,10 @@ export default function UploadNotesScreen({ navigation }) {
   const [subject, setSubject] = useState(SUBJECTS[0]);
   const [semester, setSemester] = useState(SEMESTERS[0]);
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkTitle, setBulkTitle] = useState('');
+  const [bulkTitles, setBulkTitles] = useState({});
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ visible: false, message: '', type: 'info' });
 
@@ -31,62 +43,136 @@ export default function UploadNotesScreen({ navigation }) {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/jpeg'],
+        multiple: bulkMode,
         copyToCacheDirectory: true,
       });
       if (result.canceled) {
         return;
       }
-      const selected = result.assets?.[0];
-      if (!selected) {
+      const selectedAssets = Array.isArray(result.assets) ? result.assets : [];
+      if (selectedAssets.length === 0) {
         return;
       }
-      if (!ALLOWED_TYPES.includes((selected.mimeType || '').toLowerCase())) {
-        showNotification('Only PDF, JPG, and JPEG files are allowed.', 'error');
+
+      const validAssets = selectedAssets.filter((item) => ALLOWED_TYPES.includes((item.mimeType || '').toLowerCase()));
+      if (validAssets.length !== selectedAssets.length) {
+        showNotification('Some files were skipped. Only PDF, JPG, and JPEG are allowed.', 'warning');
+      }
+      if (validAssets.length === 0) {
+        showNotification('No valid files selected.', 'error');
         return;
       }
-      setFile(selected);
+
+      if (bulkMode) {
+        setFiles((prev) => {
+          const combined = [...prev, ...validAssets];
+          const uniqueByKey = Array.from(new Map(combined.map((item) => [getFileKey(item), item])).values());
+          return uniqueByKey.slice(0, MAX_BULK_FILES);
+        });
+        setBulkTitles((prev) => {
+          const next = { ...prev };
+          for (const item of validAssets) {
+            const key = getFileKey(item);
+            if (!next[key]) {
+              next[key] = getDefaultTitleFromFileName(item.name);
+            }
+          }
+          return next;
+        });
+      } else {
+        const selected = validAssets[0];
+        setFiles([selected]);
+        const key = getFileKey(selected);
+        setBulkTitles((prev) => ({
+          ...prev,
+          [key]: getDefaultTitleFromFileName(selected.name),
+        }));
+      }
     } catch (error) {
       showNotification(getApiErrorMessage(error, 'Failed to pick file.'), 'error');
     }
   };
 
+  const clearFiles = () => {
+    setFiles([]);
+    setBulkTitles({});
+  };
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setFile(null);
+    clearFiles();
     setSubject(SUBJECTS[0]);
     setSemester(SEMESTERS[0]);
     setDepartment(DEPARTMENTS[0]);
+    setBulkMode(false);
+    setBulkTitle('');
   };
 
-  const removeFile = () => {
-    setFile(null);
+  const removeFile = (targetKey) => {
+    setFiles((prev) => prev.filter((item) => getFileKey(item) !== targetKey));
+    setBulkTitles((prev) => {
+      const next = { ...prev };
+      delete next[targetKey];
+      return next;
+    });
     showNotification('Selected file removed.', 'info');
   };
 
+  const uploadLabel = useMemo(() => {
+    if (!bulkMode) return 'Upload';
+    return files.length > 0 ? `Upload ${files.length} Files` : 'Upload Files';
+  }, [bulkMode, files.length]);
+
   const handleCreate = async () => {
-    if (!title.trim()) {
+    if (files.length === 0) {
+      showNotification('Please select file(s).', 'error');
+      return;
+    }
+    if (!bulkMode && !title.trim()) {
       showNotification('Title is required.', 'error');
       return;
     }
-    if (!file) {
-      showNotification('Please select a file.', 'error');
+    if (bulkMode && files.length > MAX_BULK_FILES) {
+      showNotification(`Maximum ${MAX_BULK_FILES} files allowed in bulk mode.`, 'error');
       return;
     }
+    if (bulkMode && !bulkTitle.trim()) {
+      showNotification('Bulk upload title is required.', 'error');
+      return;
+    }
+
     try {
       setLoading(true);
-      await notesService.createNote({
-        title: title.trim(),
-        description: description.trim(),
-        subject: `${department} - ${subject}`,
-        semester,
-        file,
-      });
-      showNotification('Note uploaded successfully.', 'success');
+      if (bulkMode) {
+        const payload = {
+          description: description.trim(),
+          subject: `${department} - ${subject}`,
+          semester,
+          bulkTitle: bulkTitle.trim(),
+          files,
+          titles: files.map((item) => {
+            const key = getFileKey(item);
+            return String(bulkTitles[key] || getDefaultTitleFromFileName(item.name)).trim();
+          }),
+        };
+        const result = await notesService.createNotesBulk(payload);
+        showNotification(result.message || 'Bulk upload complete.', result.failedCount > 0 ? 'warning' : 'success');
+      } else {
+        await notesService.createNote({
+          title: title.trim(),
+          description: description.trim(),
+          subject: `${department} - ${subject}`,
+          semester,
+          file: files[0],
+        });
+        showNotification('Note uploaded successfully.', 'success');
+      }
+
       resetForm();
       setTimeout(() => navigation.navigate('Dashboard'), 700);
     } catch (error) {
-      showNotification(getApiErrorMessage(error, 'Failed to upload note.'), 'error');
+      showNotification(getApiErrorMessage(error, 'Failed to upload note(s).'), 'error');
     } finally {
       setLoading(false);
     }
@@ -104,14 +190,44 @@ export default function UploadNotesScreen({ navigation }) {
             </View>
             <Text style={styles.headerSub}>Share PDFs and images for your classmates.</Text>
           </View>
+
           <View style={styles.card}>
-            <TextInput
-              style={styles.input}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Note title"
-              placeholderTextColor="#9A9487"
-            />
+            <View style={styles.modeRow}>
+              <TouchableOpacity
+                style={[styles.modeChip, !bulkMode && styles.modeChipActive]}
+                onPress={() => setBulkMode(false)}
+                activeOpacity={0.9}
+              >
+                <Text style={[styles.modeText, !bulkMode && styles.modeTextActive]}>Single Upload</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeChip, bulkMode && styles.modeChipActive]}
+                onPress={() => setBulkMode(true)}
+                activeOpacity={0.9}
+              >
+                <Text style={[styles.modeText, bulkMode && styles.modeTextActive]}>Bulk Upload</Text>
+              </TouchableOpacity>
+            </View>
+
+            {!bulkMode ? (
+              <TextInput
+                style={styles.input}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Note title"
+                placeholderTextColor="#9A9487"
+              />
+            ) : null}
+            {bulkMode ? (
+              <TextInput
+                style={styles.input}
+                value={bulkTitle}
+                onChangeText={setBulkTitle}
+                placeholder="Bulk upload title (e.g., Unit 1 Complete Pack)"
+                placeholderTextColor="#9A9487"
+              />
+            ) : null}
+
             <TextInput
               style={[styles.input, styles.textArea]}
               value={description}
@@ -128,37 +244,70 @@ export default function UploadNotesScreen({ navigation }) {
             <View style={styles.fileActions}>
               <TouchableOpacity style={[styles.secondaryButton, styles.fileActionButton]} onPress={pickFile} activeOpacity={0.9}>
                 <Ionicons name="document-attach-outline" size={18} color={theme.colors.primary} />
-                <Text style={styles.secondaryButtonText}>{file ? 'Change File' : 'Choose PDF/JPG'}</Text>
+                <Text style={styles.secondaryButtonText}>
+                  {files.length > 0 ? (bulkMode ? 'Add More Files' : 'Change File') : bulkMode ? 'Choose Multiple Files' : 'Choose PDF/JPG'}
+                </Text>
               </TouchableOpacity>
-              {file ? (
+              {files.length > 0 ? (
                 <TouchableOpacity
                   style={[styles.secondaryButton, styles.fileActionButton, styles.removeButton]}
-                  onPress={removeFile}
+                  onPress={clearFiles}
                   activeOpacity={0.9}
                 >
                   <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
-                  <Text style={styles.removeButtonText}>Remove File</Text>
+                  <Text style={styles.removeButtonText}>Remove All</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
 
-            {file ? (
-              <View style={styles.previewCard}>
-                <Text style={styles.previewName}>{file.name}</Text>
-                <Text style={styles.previewMeta}>
-                  {(file.mimeType || '').toUpperCase()} • {Math.max(1, Math.round((file.size || 0) / 1024))} KB
-                </Text>
-                {(file.mimeType || '').includes('image') ? <Image source={{ uri: file.uri }} style={styles.previewImage} /> : null}
+            {files.length > 0 ? (
+              <View style={styles.previewList}>
+                {files.map((file, index) => (
+                  <View key={getFileKey(file)} style={styles.previewCard}>
+                    <View style={styles.previewTopRow}>
+                      <Text style={styles.previewName} numberOfLines={1}>
+                        {file.name}
+                      </Text>
+                      <TouchableOpacity onPress={() => removeFile(getFileKey(file))} style={styles.removeOneBtn}>
+                        <Ionicons name="close-circle" size={18} color={theme.colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.previewMeta}>
+                      {(file.mimeType || '').toUpperCase()} - {Math.max(1, Math.round((file.size || 0) / 1024))} KB
+                    </Text>
+                    {bulkMode ? (
+                      <>
+                        <Text style={styles.bulkTitleLabel}>Note title for file {index + 1}</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={bulkTitles[getFileKey(file)] || ''}
+                          onChangeText={(text) =>
+                            setBulkTitles((prev) => ({
+                              ...prev,
+                              [getFileKey(file)]: text,
+                            }))
+                          }
+                          placeholder={`Title for file ${index + 1}`}
+                          placeholderTextColor="#9A9487"
+                        />
+                      </>
+                    ) : null}
+                    {(file.mimeType || '').includes('image') ? <Image source={{ uri: file.uri }} style={styles.previewImage} /> : null}
+                  </View>
+                ))}
               </View>
             ) : null}
 
             <TouchableOpacity style={styles.button} onPress={handleCreate} disabled={loading} activeOpacity={0.9}>
-              {loading ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.buttonText}>Upload</Text>}
+              {loading ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.buttonText}>{uploadLabel}</Text>}
             </TouchableOpacity>
           </View>
+
           <View style={styles.tipCard}>
             <Ionicons name="bulb-outline" size={18} color={theme.colors.accent} />
-            <Text style={styles.tipText}>Tip: Add clear titles and subject names for easier search.</Text>
+            <Text style={styles.tipText}>
+              Tip: Bulk mode allows up to {MAX_BULK_FILES} files. Duplicate files are automatically blocked.
+            </Text>
           </View>
         </ScrollView>
 
@@ -197,6 +346,29 @@ const styles = StyleSheet.create({
     padding: 14,
     ...theme.shadows.card,
   },
+  modeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    backgroundColor: '#EFF5FE',
+    borderWidth: 1,
+    borderColor: '#D4E4F8',
+    borderRadius: 14,
+    padding: 4,
+  },
+  modeChip: {
+    flex: 1,
+    borderRadius: 10,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  modeChipActive: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: '#D4E4F8',
+  },
+  modeText: { color: theme.colors.textSecondary, fontWeight: '700', fontSize: 12 },
+  modeTextActive: { color: theme.colors.primary, fontWeight: '800' },
   input: {
     borderWidth: 1,
     borderColor: theme.colors.inputBorder,
@@ -238,8 +410,12 @@ const styles = StyleSheet.create({
     color: theme.colors.error,
     fontWeight: '800',
   },
+  previewList: {
+    marginTop: 2,
+    gap: 8,
+  },
   previewCard: {
-    marginTop: 12,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceSoft,
@@ -247,8 +423,14 @@ const styles = StyleSheet.create({
     padding: 12,
     ...theme.shadows.card,
   },
-  previewName: { fontWeight: '800', color: theme.colors.textPrimary },
+  previewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewName: { fontWeight: '800', color: theme.colors.textPrimary, flex: 1, paddingRight: 8 },
+  removeOneBtn: { marginLeft: 'auto' },
   previewMeta: { color: theme.colors.textSecondary, marginTop: 4, fontSize: 12 },
+  bulkTitleLabel: { marginTop: 10, marginBottom: 6, color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700' },
   previewImage: { width: '100%', height: 180, borderRadius: 10, marginTop: 10, backgroundColor: '#F4EFE4' },
   button: {
     marginTop: 14,

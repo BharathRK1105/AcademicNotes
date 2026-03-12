@@ -80,6 +80,17 @@ export function AuthProvider({ children }) {
     await clearSession();
   }, [clearSession]);
 
+  const updateProfile = useCallback(async (payload) => {
+    const authData = await authService.updateProfile(payload);
+    setUser(authData.user);
+    setRole(authData.role);
+    return authData.user;
+  }, []);
+
+  const changePassword = useCallback(async (payload) => {
+    return authService.changePassword(payload);
+  }, []);
+
   const value = useMemo(
     () => ({
       isLoading,
@@ -93,8 +104,10 @@ export function AuthProvider({ children }) {
       loginAsAdmin,
       loginWithGoogle,
       logout,
+      updateProfile,
+      changePassword,
     }),
-    [isLoading, loginAsAdmin, loginAsStudent, loginWithGoogle, logout, registerStudent, role, token, user]
+    [changePassword, isLoading, loginAsAdmin, loginAsStudent, loginWithGoogle, logout, registerStudent, role, token, updateProfile, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

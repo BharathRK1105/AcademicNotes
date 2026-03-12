@@ -52,18 +52,16 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          <Stack.Screen name="Auth" component={AuthStack} />
-        ) : (
-          <>
-            <Stack.Screen name="MainTabs" component={RoleBasedTabs} />
-            <Stack.Screen name="AdminDashboard" component={ProtectedAdminDashboard} />
-            <Stack.Screen name="StudentDashboard" component={ProtectedStudentDashboard} />
-          </>
-        )}
-      </Stack.Navigator>
+    <NavigationContainer key={isAuthenticated ? 'app' : 'auth'}>
+      {isAuthenticated ? (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="MainTabs" component={RoleBasedTabs} />
+          <Stack.Screen name="AdminDashboard" component={ProtectedAdminDashboard} />
+          <Stack.Screen name="StudentDashboard" component={ProtectedStudentDashboard} />
+        </Stack.Navigator>
+      ) : (
+        <AuthStack />
+      )}
     </NavigationContainer>
   );
 }

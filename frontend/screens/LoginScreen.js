@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AppNotification from '../components/AppNotification';
 import { useAuth } from '../context/AuthContext';
-import { getApiErrorMessage } from '../services/api';
+import { API_BASE_URL, getApiErrorMessage } from '../services/api';
 import { theme } from '../theme';
 
 export default function LoginScreen() {
@@ -139,6 +139,7 @@ export default function LoginScreen() {
           />
         <Text style={styles.title}>Academic Notes</Text>
         <Text style={styles.subtitle}>Organize. Upload. Share.</Text>
+        {__DEV__ ? <Text style={styles.debugUrl}>API: {API_BASE_URL}</Text> : null}
 
           <Text style={styles.bgQuote}>
             {mode === 'student'
@@ -361,6 +362,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     marginBottom: 16,
+    textAlign: 'center',
+  },
+  debugUrl: {
+    fontSize: 11,
+    color: '#7B6F5B',
+    marginBottom: 12,
     textAlign: 'center',
   },
   card: {

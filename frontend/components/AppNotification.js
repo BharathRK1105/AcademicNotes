@@ -8,7 +8,7 @@ export default function AppNotification({
   message,
   type = 'info',
   onHide,
-  duration = 2200,
+  duration = 3000,
 }) {
   const translateY = useRef(new Animated.Value(-90)).current;
   const opacity = useRef(new Animated.Value(0)).current;

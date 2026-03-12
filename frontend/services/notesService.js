@@ -1,9 +1,96 @@
 import * as Linking from 'expo-linking';
+import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { API_BASE_URL, api } from './api';
 import { tokenStorage } from './tokenStorage';
 
 export const notesService = {
+  async postMultipart(endpoint, formData) {
+    if (Platform.OS === 'web') {
+      return api.post(endpoint, formData, { timeout: 30000 });
+    }
+
+    const token = await tokenStorage.getToken();
+    const url = `${API_BASE_URL}${endpoint}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Accept: 'application/json',
+      },
+      body: formData,
+    });
+
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_error) {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const message = data?.message || `Upload failed with status ${response.status}`;
+      throw new Error(message);
+    }
+
+    return { data };
+  },
+
+  async normalizeFileForUpload(file) {
+    if (!file?.uri || Platform.OS === 'web') {
+      return file;
+    }
+
+    const uri = String(file.uri);
+    const isFileUri = uri.startsWith('file://');
+    if (isFileUri) {
+      return file;
+    }
+
+    try {
+      const fallbackName = file?.name || `upload-${Date.now()}`;
+      const targetUri = `${FileSystem.cacheDirectory || ''}${fallbackName}`;
+      await FileSystem.copyAsync({ from: uri, to: targetUri });
+      return { ...file, uri: targetUri, name: file?.name || fallbackName };
+    } catch (_error) {
+      return file;
+    }
+  },
+
+  async appendFileToFormData(formData, file, fieldName = 'file') {
+    if (Platform.OS === 'web') {
+      if (file.file) {
+        formData.append(fieldName, file.file, file.name || 'upload-file');
+      } else {
+        const fileResponse = await fetch(file.uri);
+        const blob = await fileResponse.blob();
+        formData.append(fieldName, blob, file.name || 'upload-file');
+      }
+    } else {
+      const normalized = await this.normalizeFileForUpload(file);
+      const fallbackName = file?.uri ? file.uri.split('/').pop() : '';
+      const resolvedName = normalized?.name || fallbackName || `upload-${Date.now()}`;
+      const ext = resolvedName.includes('.') ? resolvedName.split('.').pop().toLowerCase() : '';
+      const inferredType =
+        ext === 'pdf' ? 'application/pdf' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/octet-stream';
+      const mimeType = normalized?.mimeType || normalized?.type || inferredType;
+      let finalName = resolvedName;
+      if (!ext) {
+        if (mimeType === 'application/pdf') {
+          finalName = `${resolvedName}.pdf`;
+        } else if (mimeType === 'image/jpeg') {
+          finalName = `${resolvedName}.jpg`;
+        }
+      }
+      formData.append(fieldName, {
+        uri: normalized?.uri,
+        name: finalName,
+        type: mimeType,
+      });
+    }
+  },
+
   async createNote(payload) {
     const formData = new FormData();
     formData.append('title', payload.title);
@@ -16,23 +103,33 @@ export const notesService = {
     if (payload.semester) {
       formData.append('semester', payload.semester);
     }
-    if (Platform.OS === 'web') {
-      if (payload.file.file) {
-        formData.append('file', payload.file.file, payload.file.name || 'upload-file');
-      } else {
-        const fileResponse = await fetch(payload.file.uri);
-        const blob = await fileResponse.blob();
-        formData.append('file', blob, payload.file.name || 'upload-file');
-      }
-    } else {
-      formData.append('file', {
-        uri: payload.file.uri,
-        name: payload.file.name,
-        type: payload.file.mimeType || 'application/octet-stream',
-      });
+    await this.appendFileToFormData(formData, payload.file, 'file');
+
+    const response = await this.postMultipart('/notes', formData);
+    return response.data;
+  },
+
+  async createNotesBulk(payload) {
+    const formData = new FormData();
+    if (payload.description) {
+      formData.append('description', payload.description);
+    }
+    if (payload.subject) {
+      formData.append('subject', payload.subject);
+    }
+    if (payload.semester) {
+      formData.append('semester', payload.semester);
+    }
+    if (payload.bulkTitle) {
+      formData.append('bulkTitle', payload.bulkTitle);
+    }
+    formData.append('titles', JSON.stringify(payload.titles || []));
+
+    for (const file of payload.files || []) {
+      await this.appendFileToFormData(formData, file, 'files');
     }
 
-    const response = await api.post('/notes', formData);
+    const response = await this.postMultipart('/notes/bulk', formData);
     return response.data;
   },
 
@@ -41,8 +138,18 @@ export const notesService = {
     return response.data;
   },
 
+  async getSavedNotes() {
+    const response = await api.get('/notes/saved/me');
+    return response.data;
+  },
+
   async getMyNotes() {
     const response = await api.get('/notes/mine');
+    return response.data;
+  },
+
+  async getMyActivity() {
+    const response = await api.get('/notes/activity/me');
     return response.data;
   },
 
@@ -63,6 +170,11 @@ export const notesService = {
 
   async rateNote(noteId, value) {
     const response = await api.post(`/notes/${noteId}/rate`, { value });
+    return response.data;
+  },
+
+  async toggleSaveNote(noteId) {
+    const response = await api.patch(`/notes/${noteId}/save`);
     return response.data;
   },
 

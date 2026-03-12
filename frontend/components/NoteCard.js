@@ -18,6 +18,8 @@ export default function NoteCard({
   showEdit = false,
   averageRating = 0,
   ratingsCount = 0,
+  trustScore = 0,
+  trustTier = 'Low',
   onToggleVisibility,
   showVisibilityToggle = false,
   isOwner = false,
@@ -63,34 +65,45 @@ export default function NoteCard({
             <Text style={styles.statusText}>{statusLabel}</Text>
           </View>
         ) : null}
-        <View style={styles.ratingPill}>
-          <Ionicons name="star" size={12} color="#D97706" />
-          <Text style={styles.ratingText}>
-            {averageRating > 0 ? averageRating : '0.0'} ({ratingsCount})
-          </Text>
+        <View style={styles.metaRight}>
+          <View style={[styles.trustPill, trustTier === 'High' ? styles.trustHigh : trustTier === 'Medium' ? styles.trustMedium : styles.trustLow]}>
+            <Ionicons name="shield-checkmark-outline" size={12} color={trustTier === 'High' ? '#0F6F3A' : trustTier === 'Medium' ? '#8A5A00' : '#A33A3A'} />
+            <Text style={[styles.trustText, trustTier === 'High' ? styles.trustTextHigh : trustTier === 'Medium' ? styles.trustTextMedium : styles.trustTextLow]}>
+              Trust {trustScore}
+            </Text>
+          </View>
+          <View style={styles.ratingPill}>
+            <Ionicons name="star" size={12} color="#D97706" />
+            <Text style={styles.ratingText}>
+              {averageRating > 0 ? averageRating : '0.0'} ({ratingsCount})
+            </Text>
+          </View>
         </View>
       </View>
 
-      <TouchableOpacity style={styles.downloadButton} onPress={() => onDownload(note)}>
+      <TouchableOpacity style={styles.downloadButton} onPress={() => onDownload(note)} activeOpacity={0.9}>
         <Ionicons name="cloud-download-outline" size={20} color={theme.colors.white} />
         <Text style={styles.downloadButtonText}>Download</Text>
       </TouchableOpacity>
 
       <View style={styles.actionsRow}>
         {showVisibilityToggle && isOwner && onToggleVisibility ? (
-          <TouchableOpacity style={styles.actionChip} onPress={() => onToggleVisibility(note)}>
+          <TouchableOpacity style={[styles.actionChip, styles.actionChipWarm]} onPress={() => onToggleVisibility(note)}>
             <Ionicons name={note.isHidden ? 'eye-outline' : 'eye-off-outline'} size={16} color={theme.colors.primary} />
             <Text style={styles.actionText}>{note.isHidden ? 'Unhide' : 'Hide'}</Text>
           </TouchableOpacity>
         ) : null}
         {onToggleBookmark ? (
-          <TouchableOpacity style={styles.actionChip} onPress={() => onToggleBookmark(note)}>
+          <TouchableOpacity
+            style={[styles.actionChip, isBookmarked && styles.actionChipSaved]}
+            onPress={() => onToggleBookmark(note)}
+          >
             <Ionicons
               name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
               size={16}
-              color={theme.colors.primary}
+              color={isBookmarked ? '#0F6F3A' : theme.colors.primary}
             />
-            <Text style={styles.actionText}>{isBookmarked ? 'Saved' : 'Save'}</Text>
+            <Text style={[styles.actionText, isBookmarked && styles.actionTextSaved]}>{isBookmarked ? 'Saved' : 'Save'}</Text>
           </TouchableOpacity>
         ) : null}
         {onRate ? (
@@ -107,22 +120,30 @@ export default function NoteCard({
         ) : null}
       </View>
 
-      {showEdit ? (
-        <TouchableOpacity style={styles.editButton} onPress={() => onEdit && onEdit(note)}>
-          <Ionicons name="create-outline" size={18} color={theme.colors.white} />
-          <Text style={styles.downloadButtonText}>Edit</Text>
-        </TouchableOpacity>
-      ) : null}
-
-      {showDelete ? (
-        <TouchableOpacity
-          style={[styles.deleteButton, !canDelete && styles.deleteButtonDisabled]}
-          onPress={() => canDelete && onDelete && onDelete(note)}
-          disabled={!canDelete}
-        >
-          <Ionicons name="trash-outline" size={18} color={theme.colors.white} />
-          <Text style={styles.downloadButtonText}>{canDelete ? 'Delete' : 'No Permission'}</Text>
-        </TouchableOpacity>
+      {showEdit || showDelete ? (
+        <View style={styles.managementRow}>
+          {showEdit ? (
+            <TouchableOpacity style={styles.managementChip} onPress={() => onEdit && onEdit(note)}>
+              <Ionicons name="create-outline" size={16} color={theme.colors.info} />
+              <Text style={styles.managementText} numberOfLines={1}>Edit</Text>
+            </TouchableOpacity>
+          ) : null}
+          {showDelete ? (
+            <TouchableOpacity
+              style={[styles.managementChip, styles.managementDanger, !canDelete && styles.managementDisabled]}
+              onPress={() => canDelete && onDelete && onDelete(note)}
+              disabled={!canDelete}
+            >
+              <Ionicons name="trash-outline" size={16} color={canDelete ? theme.colors.logout : '#9AAABF'} />
+              <Text
+                style={[styles.managementText, canDelete ? styles.managementDangerText : styles.managementDisabledText]}
+                numberOfLines={1}
+              >
+                {canDelete ? 'Delete' : 'No Permission'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -132,7 +153,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    padding: 16,
+    padding: 14,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -191,6 +212,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  metaRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   statusChip: {
     borderWidth: 1,
     borderColor: '#C7B585',
@@ -221,7 +247,36 @@ const styles = StyleSheet.create({
     color: '#8A5A00',
     fontWeight: '800',
   },
+  trustPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  trustHigh: {
+    backgroundColor: '#EAF9EF',
+    borderColor: '#A9DDBB',
+  },
+  trustMedium: {
+    backgroundColor: '#FFF5DD',
+    borderColor: '#F4D18A',
+  },
+  trustLow: {
+    backgroundColor: '#FEECEC',
+    borderColor: '#F5B2B2',
+  },
+  trustText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  trustTextHigh: { color: '#0F6F3A' },
+  trustTextMedium: { color: '#8A5A00' },
+  trustTextLow: { color: '#A33A3A' },
   downloadButton: {
+    marginTop: 2,
     flexDirection: 'row',
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.sm,
@@ -231,7 +286,7 @@ const styles = StyleSheet.create({
     ...theme.shadows.button,
   },
   actionsRow: {
-    marginTop: 8,
+    marginTop: 10,
     flexDirection: 'row',
     gap: 8,
     flexWrap: 'wrap',
@@ -239,12 +294,20 @@ const styles = StyleSheet.create({
   actionChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FBF4DF',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#C7B585',
+    borderColor: theme.colors.border,
     borderRadius: theme.radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 7,
+  },
+  actionChipWarm: {
+    backgroundColor: '#FFF7E8',
+    borderColor: '#EAC98B',
+  },
+  actionChipSaved: {
+    backgroundColor: '#EAF9EF',
+    borderColor: '#A9DDBB',
   },
   actionText: {
     marginLeft: 5,
@@ -252,26 +315,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  editButton: {
+  actionTextSaved: {
+    color: '#0F6F3A',
+  },
+  managementRow: {
     marginTop: 9,
     flexDirection: 'row',
-    backgroundColor: theme.colors.info,
-    borderRadius: theme.radius.sm,
-    paddingVertical: 10,
+    gap: 8,
+  },
+  managementChip: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#D7E2F1',
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteButton: {
-    marginTop: 9,
-    flexDirection: 'row',
-    backgroundColor: theme.colors.logout,
-    borderRadius: theme.radius.sm,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  managementText: {
+    marginLeft: 5,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
   },
-  deleteButtonDisabled: {
-    backgroundColor: '#9AAABF',
+  managementDanger: {
+    borderColor: '#F0B6B6',
+    backgroundColor: '#FFF2F2',
+  },
+  managementDangerText: {
+    color: theme.colors.logout,
+  },
+  managementDisabled: {
+    borderColor: '#D9DFE7',
+    backgroundColor: '#F4F6F9',
+  },
+  managementDisabledText: {
+    color: '#9AAABF',
   },
   downloadButtonText: {
     color: theme.colors.white,

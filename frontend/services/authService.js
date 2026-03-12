@@ -35,6 +35,16 @@ export const authService = {
     return response.data;
   },
 
+  async updateProfile(payload) {
+    const response = await api.patch('/auth/me', payload);
+    return response.data;
+  },
+
+  async changePassword(payload) {
+    const response = await api.patch('/auth/change-password', payload);
+    return response.data;
+  },
+
   async getStoredToken() {
     return tokenStorage.getToken();
   },

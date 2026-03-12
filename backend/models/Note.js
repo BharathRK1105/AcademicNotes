@@ -52,6 +52,16 @@ const noteSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    fileHash: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    downloadCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     isHidden: {
       type: Boolean,
       default: false,
@@ -75,8 +85,34 @@ const noteSchema = new mongoose.Schema(
           min: 1,
           max: 5,
         },
+        ratedAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
+    savedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    bulkGroupId: {
+      type: String,
+      trim: true,
+      default: '',
+      index: true,
+    },
+    bulkTitle: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    bulkItemOrder: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,

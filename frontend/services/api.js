@@ -1,11 +1,38 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { tokenStorage } from './tokenStorage';
 
-const DEFAULT_BASE_URL =
-  Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+const resolveBaseUrl = () => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    const rawUrl = process.env.EXPO_PUBLIC_API_URL.trim();
+    if (/\/api\/?$/.test(rawUrl)) {
+      return rawUrl;
+    }
+    return `${rawUrl.replace(/\/+$/, '')}/api`;
+  }
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_BASE_URL;
+  const hostUri = Constants?.expoConfig?.hostUri || Constants?.expoGoConfig?.hostUri || '';
+  if (hostUri) {
+    const host = hostUri.split(':')[0];
+    if (host) {
+      return `http://${host}:5000/api`;
+    }
+  }
+
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5000/api';
+  }
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const webHost = window.location.hostname || 'localhost';
+    return `http://${webHost}:5000/api`;
+  }
+
+  return 'http://localhost:5000/api';
+};
+
+const BASE_URL = resolveBaseUrl();
 
 let unauthorizedHandler = null;
 
@@ -37,6 +64,9 @@ export function setUnauthorizedHandler(handler) {
 }
 
 export function getApiErrorMessage(error, fallback = 'Something went wrong. Please try again.') {
+  if (error?.code === 'ECONNABORTED') {
+    return 'Request timed out. Make sure the backend is running and the API URL is reachable.';
+  }
   return error?.response?.data?.message || error?.message || fallback;
 }
 

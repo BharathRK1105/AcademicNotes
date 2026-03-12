@@ -2,12 +2,54 @@ const express = require('express');
 const fs = require('fs');
 const User = require('../models/User');
 const Note = require('../models/Note');
+const AdminAction = require('../models/AdminAction');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
 router.use(authMiddleware, roleMiddleware('admin'));
+
+const logAdminAction = async ({ adminId, actionType, targetType, targetId, targetLabel }) => {
+  await AdminAction.create({
+    adminId,
+    actionType,
+    targetType,
+    targetId,
+    targetLabel: targetLabel || '',
+  });
+};
+
+router.get('/profile/insights', async (req, res, next) => {
+  try {
+    const [users, notes, recentActions, allActions] = await Promise.all([
+      User.find(),
+      Note.find(),
+      AdminAction.find({ adminId: req.user._id }).sort({ createdAt: -1 }).limit(5),
+      AdminAction.find({ adminId: req.user._id }),
+    ]);
+
+    const stats = {
+      totalUsers: users.length,
+      activeUsers: users.filter((item) => !item.isBlocked).length,
+      totalNotes: notes.length,
+      hiddenNotes: notes.filter((item) => item.isHidden).length,
+      blockedUsers: allActions.filter((item) => item.actionType === 'block_user').length,
+      unblockedUsers: allActions.filter((item) => item.actionType === 'unblock_user').length,
+      notesHiddenByAdmin: allActions.filter((item) => item.actionType === 'hide_note').length,
+      notesUnhiddenByAdmin: allActions.filter((item) => item.actionType === 'unhide_note').length,
+      deletionsDone: allActions.filter((item) => item.actionType === 'delete_note' || item.actionType === 'delete_user').length,
+      reportedContent: 0,
+    };
+
+    return res.status(200).json({
+      stats,
+      recentActions,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 router.get('/users', async (_req, res, next) => {
   try {
@@ -30,6 +72,13 @@ router.delete('/users/:id', async (req, res, next) => {
     }
     await Note.deleteMany({ userId: user._id });
     await user.deleteOne();
+    await logAdminAction({
+      adminId: req.user._id,
+      actionType: 'delete_user',
+      targetType: 'user',
+      targetId: user._id,
+      targetLabel: user.name || user.email,
+    });
     return res.status(200).json({ message: 'User deleted' });
   } catch (error) {
     return next(error);
@@ -48,6 +97,13 @@ router.patch('/users/:id/block', async (req, res, next) => {
     }
     user.isBlocked = Boolean(isBlocked);
     await user.save();
+    await logAdminAction({
+      adminId: req.user._id,
+      actionType: user.isBlocked ? 'block_user' : 'unblock_user',
+      targetType: 'user',
+      targetId: user._id,
+      targetLabel: user.name || user.email,
+    });
     return res.status(200).json(user);
   } catch (error) {
     return next(error);
@@ -75,6 +131,13 @@ router.patch('/notes/:id/visibility', async (req, res, next) => {
     note.isHidden = nextHiddenState;
     note.hiddenBy = nextHiddenState ? 'admin' : null;
     await note.save();
+    await logAdminAction({
+      adminId: req.user._id,
+      actionType: nextHiddenState ? 'hide_note' : 'unhide_note',
+      targetType: 'note',
+      targetId: note._id,
+      targetLabel: note.title,
+    });
     return res.status(200).json(note);
   } catch (error) {
     return next(error);
@@ -91,6 +154,13 @@ router.delete('/notes/:id', async (req, res, next) => {
       fs.unlinkSync(note.filePath);
     }
     await note.deleteOne();
+    await logAdminAction({
+      adminId: req.user._id,
+      actionType: 'delete_note',
+      targetType: 'note',
+      targetId: note._id,
+      targetLabel: note.title,
+    });
     return res.status(200).json({ message: 'Note deleted by admin' });
   } catch (error) {
     return next(error);

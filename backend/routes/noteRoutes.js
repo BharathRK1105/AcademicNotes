@@ -64,6 +64,10 @@ const findDuplicateNote = async ({ uploadedHash, uploadedSize }) => {
     return exactHashDuplicate;
   }
 
+  return findLegacyDuplicateNote({ uploadedHash, uploadedSize });
+};
+
+const findLegacyDuplicateNote = async ({ uploadedHash, uploadedSize }) => {
   // Backward compatibility: old notes may not have fileHash stored yet.
   // For those, compare only same-size files to keep this bounded.
   const legacyCandidates = await Note.find({
@@ -87,6 +91,13 @@ const findDuplicateNote = async ({ uploadedHash, uploadedSize }) => {
 
   return null;
 };
+
+const legacyNotesExist = async () =>
+  Boolean(
+    await Note.exists({
+      $or: [{ fileHash: { $exists: false } }, { fileHash: null }, { fileHash: '' }],
+    })
+  );
 
 const enrichNote = (noteDoc, currentUserId) => {
   const note = noteDoc.toObject ? noteDoc.toObject() : noteDoc;
@@ -201,17 +212,30 @@ router.post('/bulk', upload.array('files', 10), async (req, res, next) => {
     const created = [];
     const failed = [];
 
-    for (let index = 0; index < files.length; index += 1) {
-      const file = files[index];
-      const filePath = file.path.replace(/\\/g, '/');
-      const fileUrl = `/uploads/${file.filename}`;
+    const legacyExists = await legacyNotesExist();
+    const fileInfos = await Promise.all(
+      files.map(async (file, index) => ({
+        file,
+        index,
+        filePath: file.path.replace(/\\/g, '/'),
+        fileUrl: `/uploads/${file.filename}`,
+        fileHash: await computeFileHash(file.path.replace(/\\/g, '/')),
+      }))
+    );
+    const hashes = fileInfos.map((item) => item.fileHash);
+    const existingDuplicates = await Note.find({ fileHash: { $in: hashes } }).populate('userId', 'name');
+    const existingByHash = new Map(existingDuplicates.map((note) => [note.fileHash, note]));
 
+    for (const info of fileInfos) {
+      const { file, index, filePath, fileUrl, fileHash } = info;
       try {
-        const fileHash = await computeFileHash(filePath);
-        const duplicateNote = await findDuplicateNote({
-          uploadedHash: fileHash,
-          uploadedSize: file.size,
-        });
+        let duplicateNote = existingByHash.get(fileHash) || null;
+        if (!duplicateNote && legacyExists) {
+          duplicateNote = await findLegacyDuplicateNote({
+            uploadedHash: fileHash,
+            uploadedSize: file.size,
+          });
+        }
         if (duplicateNote) {
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);

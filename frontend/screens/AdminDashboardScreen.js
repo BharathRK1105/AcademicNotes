@@ -36,7 +36,9 @@ function AdminDashboardContent({ route }) {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [notes, setNotes] = useState([]);
-  const initialPanel = route?.params?.panel === 'users' ? 'users' : 'notes';
+  const [reports, setReports] = useState([]);
+  const initialPanel =
+    route?.params?.panel === 'users' ? 'users' : route?.params?.panel === 'reports' ? 'reports' : 'notes';
   const [activePanel, setActivePanel] = useState(initialPanel);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +47,7 @@ function AdminDashboardContent({ route }) {
   const [bulkViewTarget, setBulkViewTarget] = useState(null);
   const [bulkSelectedIds, setBulkSelectedIds] = useState(new Set());
   const [bulkPackAction, setBulkPackAction] = useState(null);
+  const [reportAction, setReportAction] = useState(null);
   const [notification, setNotification] = useState({ visible: false, message: '', type: 'info' });
 
   const showNotification = (message, type = 'info') => setNotification({ visible: true, message, type });
@@ -52,9 +55,14 @@ function AdminDashboardContent({ route }) {
 
   const loadData = useCallback(async () => {
     try {
-      const [usersData, notesData] = await Promise.all([adminService.getUsers(), notesService.getAllNotesAsAdmin()]);
+      const [usersData, notesData, reportsData] = await Promise.all([
+        adminService.getUsers(),
+        notesService.getAllNotesAsAdmin(),
+        adminService.getReports(),
+      ]);
       setUsers(usersData);
       setNotes(notesData);
+      setReports(reportsData);
     } catch (error) {
       showNotification(getApiErrorMessage(error, 'Failed to load admin data.'), 'error');
     } finally {
@@ -80,8 +88,9 @@ function AdminDashboardContent({ route }) {
       totalStudents: users.filter((item) => item.role === 'student').length,
       activeUsers: users.filter((item) => !item.isBlocked).length,
       totalNotes: notes.length,
+      openReports: reports.filter((item) => item.status === 'open').length,
     }),
-    [notes.length, users]
+    [notes.length, reports, users]
   );
 
   const notesList = useMemo(() => {
@@ -140,9 +149,23 @@ function AdminDashboardContent({ route }) {
     }
   }, [notesList]);
 
+  const reportsList = useMemo(() => {
+    const source = Array.isArray(reports) ? reports.slice() : [];
+    return source.sort((a, b) => {
+      const aOpen = a.status === 'open';
+      const bOpen = b.status === 'open';
+      if (aOpen !== bOpen) {
+        return aOpen ? -1 : 1;
+      }
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+  }, [reports]);
+
   useEffect(() => {
     if (route?.params?.panel === 'users') {
       setActivePanel('users');
+    } else if (route?.params?.panel === 'reports') {
+      setActivePanel('reports');
     } else {
       setActivePanel('notes');
     }
@@ -291,6 +314,24 @@ function AdminDashboardContent({ route }) {
     }
   };
 
+  const handleResolveReport = async () => {
+    if (!reportAction?.report || !reportAction?.action) return;
+    try {
+      await adminService.resolveReport(reportAction.report._id, reportAction.action);
+      const label =
+        reportAction.action === 'hide'
+          ? 'Report resolved. Note hidden.'
+          : reportAction.action === 'delete'
+          ? 'Report resolved. Note deleted.'
+          : 'Report dismissed.';
+      showNotification(label, reportAction.action === 'dismiss' ? 'info' : 'success');
+      setReportAction(null);
+      await loadData();
+    } catch (error) {
+      showNotification(getApiErrorMessage(error, 'Failed to resolve report.'), 'error');
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -417,6 +458,82 @@ function AdminDashboardContent({ route }) {
     );
   };
 
+  const renderReport = ({ item }) => {
+    const note = item.noteId;
+    const reporter = item.reportedBy;
+    const noteTitle = note?.title || item.noteTitle || 'Unknown note';
+    const noteOwner = note?.userId?.name || item.noteOwnerName || 'Unknown';
+    const createdAt = item.createdAt ? new Date(item.createdAt).toLocaleString() : 'N/A';
+    const statusLabel = item.status === 'open' ? 'Open' : item.status === 'dismissed' ? 'Dismissed' : 'Resolved';
+    const canAct = item.status === 'open';
+    const noteHidden = Boolean(note?.isHidden);
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.reportHeader}>
+          <Text style={styles.title}>{noteTitle}</Text>
+          <View style={[styles.reportStatus, item.status === 'open' ? styles.reportOpen : item.status === 'dismissed' ? styles.reportDismissed : styles.reportResolved]}>
+            <Text style={styles.reportStatusText}>{statusLabel}</Text>
+          </View>
+        </View>
+        <Text style={styles.meta}>Reported by: {reporter?.name || 'Unknown'} ({reporter?.email || 'N/A'})</Text>
+        <Text style={styles.meta}>Owner: {noteOwner}</Text>
+        <Text style={styles.meta}>Reason: {(item.reason || 'other').replace('_', ' ')}</Text>
+        {item.details ? <Text style={styles.meta}>Details: {item.details}</Text> : null}
+        <Text style={styles.meta}>Reported at: {createdAt}</Text>
+
+        {note ? (
+          <View style={styles.reportNoteMeta}>
+            <Text style={styles.reportNoteText}>
+              {note.subject ? `${note.subject} - ` : ''}{note.semester || ''}{note.fileName ? ` | ${note.fileName}` : ''}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.meta}>Note status: Deleted or unavailable</Text>
+        )}
+
+        <View style={styles.reportActions}>
+          {note ? (
+            <TouchableOpacity style={styles.viewButton} onPress={() => notesService.openNoteFile(note)} activeOpacity={0.88}>
+              <Ionicons name="open-outline" size={16} color={theme.colors.white} />
+              <Text style={styles.deleteText}>Open Note</Text>
+            </TouchableOpacity>
+          ) : null}
+          {canAct && note && !noteHidden ? (
+            <TouchableOpacity
+              style={[styles.viewButton, styles.hideButton]}
+              onPress={() => setReportAction({ action: 'hide', report: item })}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="eye-off-outline" size={16} color={theme.colors.white} />
+              <Text style={styles.deleteText}>Hide Note</Text>
+            </TouchableOpacity>
+          ) : null}
+          {canAct && note ? (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => setReportAction({ action: 'delete', report: item })}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="trash-outline" size={16} color={theme.colors.white} />
+              <Text style={styles.deleteText}>Delete Note</Text>
+            </TouchableOpacity>
+          ) : null}
+          {canAct ? (
+            <TouchableOpacity
+              style={[styles.viewButton, styles.dismissButton]}
+              onPress={() => setReportAction({ action: 'dismiss', report: item })}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="close-circle-outline" size={16} color={theme.colors.white} />
+              <Text style={styles.deleteText}>Dismiss</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="dark" />
@@ -442,6 +559,7 @@ function AdminDashboardContent({ route }) {
           <SummaryCard label="Users" value={summary.totalUsers} icon="people-outline" />
           <SummaryCard label="Active" value={summary.activeUsers} icon="checkmark-circle-outline" />
           <SummaryCard label="Notes" value={summary.totalNotes} icon="albums-outline" />
+          <SummaryCard label="Reports" value={summary.openReports} icon="flag-outline" />
         </View>
 
         <View style={styles.segmentRow}>
@@ -459,12 +577,19 @@ function AdminDashboardContent({ route }) {
           >
             <Text style={[styles.segmentText, activePanel === 'users' && styles.segmentTextActive]}>All Users</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activePanel === 'reports' && styles.segmentActive]}
+            onPress={() => setActivePanel('reports')}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.segmentText, activePanel === 'reports' && styles.segmentTextActive]}>Reports</Text>
+          </TouchableOpacity>
         </View>
 
         <FlatList
-          data={activePanel === 'notes' ? groupedNotes : users}
+          data={activePanel === 'notes' ? groupedNotes : activePanel === 'users' ? users : reportsList}
           keyExtractor={(item) => item._id}
-          renderItem={activePanel === 'notes' ? renderNote : renderUser}
+          renderItem={activePanel === 'notes' ? renderNote : activePanel === 'users' ? renderUser : renderReport}
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
@@ -476,8 +601,10 @@ function AdminDashboardContent({ route }) {
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Ionicons name="albums-outline" size={46} color="#9CA3AF" />
-              <Text style={styles.empty}>No records found.</Text>
+              <Ionicons name={activePanel === 'users' ? 'people-outline' : activePanel === 'reports' ? 'flag-outline' : 'albums-outline'} size={46} color="#9CA3AF" />
+              <Text style={styles.empty}>
+                {activePanel === 'users' ? 'No users found.' : activePanel === 'reports' ? 'No reports found.' : 'No notes found.'}
+              </Text>
             </View>
           }
         />
@@ -603,6 +730,33 @@ function AdminDashboardContent({ route }) {
           tone={bulkPackAction?.type === 'delete' ? 'danger' : 'primary'}
           onCancel={() => setBulkPackAction(null)}
           onConfirm={handleBulkPackAction}
+        />
+
+        <ActionPrompt
+          visible={Boolean(reportAction)}
+          title={
+            reportAction?.action === 'delete'
+              ? 'Delete Reported Note'
+              : reportAction?.action === 'hide'
+              ? 'Hide Reported Note'
+              : 'Dismiss Report'
+          }
+          message={
+            reportAction
+              ? reportAction.action === 'dismiss'
+                ? 'Dismiss this report without taking action?'
+                : `${reportAction.action === 'delete' ? 'Delete' : 'Hide'} "${
+                    reportAction.report?.noteId?.title || reportAction.report?.noteTitle || 'this note'
+                  }" and resolve the report?`
+              : ''
+          }
+          confirmText={
+            reportAction?.action === 'delete' ? 'Delete Note' : reportAction?.action === 'hide' ? 'Hide Note' : 'Dismiss'
+          }
+          cancelText="Cancel"
+          tone={reportAction?.action === 'delete' ? 'danger' : 'primary'}
+          onCancel={() => setReportAction(null)}
+          onConfirm={handleResolveReport}
         />
 
         <AppNotification
@@ -861,5 +1015,44 @@ const styles = StyleSheet.create({
   bulkHideModalText: {
     color: '#8C6A2D',
     fontWeight: '800',
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  reportStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  reportStatusText: { fontSize: 11, fontWeight: '800', color: theme.colors.textSecondary },
+  reportOpen: { backgroundColor: '#EAF3FF', borderColor: '#BBD4F1' },
+  reportResolved: { backgroundColor: '#EAF9EF', borderColor: '#A9DDBB' },
+  reportDismissed: { backgroundColor: '#F4F6F9', borderColor: '#D9DFE7' },
+  reportActions: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  reportNoteMeta: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#D7E2F1',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#F8FBFF',
+  },
+  reportNoteText: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    fontWeight: '700',
+  },
+  dismissButton: {
+    backgroundColor: '#6B7280',
   },
 });

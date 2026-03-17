@@ -28,6 +28,13 @@ import { theme } from '../theme';
 
 const ALL_SEMESTERS = ['All Semesters', ...SEMESTERS];
 const ALL_DEPARTMENTS = ['All Departments', ...DEPARTMENTS];
+const REPORT_REASONS = [
+  { value: 'spam', label: 'Spam or Ads' },
+  { value: 'inaccurate', label: 'Inaccurate Content' },
+  { value: 'inappropriate', label: 'Inappropriate' },
+  { value: 'copyright', label: 'Copyright Issue' },
+  { value: 'other', label: 'Other' },
+];
 
 export default function StudentDashboardScreen({ navigation }) {
   const { currentUser } = useAuth();
@@ -46,6 +53,10 @@ export default function StudentDashboardScreen({ navigation }) {
   const [viewMode, setViewMode] = useState('all');
   const [semesterFilter, setSemesterFilter] = useState(ALL_SEMESTERS[0]);
   const [departmentFilter, setDepartmentFilter] = useState(ALL_DEPARTMENTS[0]);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportReason, setReportReason] = useState(REPORT_REASONS[0].value);
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const [notification, setNotification] = useState({ visible: false, message: '', type: 'info' });
   const firstName = String(currentUser?.name || 'Student').split(' ')[0];
   const isAdmin = currentUser?.role === 'admin';
@@ -188,6 +199,38 @@ export default function StudentDashboardScreen({ navigation }) {
       return;
     }
     openRateModal(note);
+  };
+
+  const handleReportPress = (note) => {
+    if (isOwnerOfFile(note)) {
+      showNotification('You cannot report your own note.', 'warning');
+      return;
+    }
+    setReportTarget(note);
+    setReportReason(REPORT_REASONS[0].value);
+    setReportDetails('');
+  };
+
+  const submitReport = async () => {
+    if (!reportTarget) return;
+    if (!reportReason) {
+      showNotification('Please choose a reason for the report.', 'error');
+      return;
+    }
+    setReportSubmitting(true);
+    try {
+      await notesService.reportNote(reportTarget._id, {
+        reason: reportReason,
+        details: reportDetails,
+      });
+      setReportTarget(null);
+      setReportDetails('');
+      showNotification('Report submitted. Thanks for helping us keep content clean.', 'success');
+    } catch (error) {
+      showNotification(getApiErrorMessage(error, 'Failed to submit report.'), 'error');
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   const resetBulkSelection = () => setBulkSelectedIds(new Set());
@@ -554,6 +597,7 @@ export default function StudentDashboardScreen({ navigation }) {
                 onDownload={() => notesService.openNoteFile(item)}
                 onDelete={() => setDeleteTarget(item)}
                 onRate={() => handleRatePress(item)}
+                onReport={() => handleReportPress(item)}
                 onToggleBookmark={() => handleToggleBookmark(item)}
                 isBookmarked={Boolean(item.isSavedByMe)}
                 onToggleVisibility={() => setVisibilityTarget(item)}
@@ -661,6 +705,55 @@ export default function StudentDashboardScreen({ navigation }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSave} onPress={submitRating}>
                 <Text style={styles.modalSaveText}>Save Rating</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={Boolean(reportTarget)} transparent animationType="fade" onRequestClose={() => setReportTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Report Note</Text>
+            <Text style={styles.modalSub}>{reportTarget?.title || ''}</Text>
+            <Text style={styles.modalHint}>Choose a reason</Text>
+            <View style={styles.reportReasonRow}>
+              {REPORT_REASONS.map((reason) => (
+                <TouchableOpacity
+                  key={reason.value}
+                  style={[
+                    styles.reportReasonChip,
+                    reportReason === reason.value && styles.reportReasonChipActive,
+                  ]}
+                  onPress={() => setReportReason(reason.value)}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.reportReasonText,
+                      reportReason === reason.value && styles.reportReasonTextActive,
+                    ]}
+                  >
+                    {reason.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.modalHint}>Optional details</Text>
+            <TextInput
+              style={[styles.input, styles.reportDetails]}
+              placeholder="Tell us what is wrong with this note (optional)"
+              placeholderTextColor="#9A9487"
+              value={reportDetails}
+              onChangeText={setReportDetails}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setReportTarget(null)} disabled={reportSubmitting}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSave} onPress={submitReport} disabled={reportSubmitting}>
+                <Text style={styles.modalSaveText}>{reportSubmitting ? 'Submitting...' : 'Submit Report'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1111,6 +1204,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: '900', color: theme.colors.textPrimary },
   modalSub: { marginTop: 4, color: theme.colors.textSecondary, fontSize: 12 },
+  modalHint: { marginTop: 10, color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700' },
   starsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14, marginBottom: 14 },
   starButton: { padding: 2 },
   modalActions: { flexDirection: 'row', gap: 8 },
@@ -1134,6 +1228,46 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     paddingVertical: 10,
+  },
+  input: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.textPrimary,
+  },
+  reportReasonRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reportReasonChip: {
+    borderWidth: 1,
+    borderColor: '#D7E2F1',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#F8FBFF',
+  },
+  reportReasonChipActive: {
+    borderColor: '#A9DDBB',
+    backgroundColor: '#EAF9EF',
+  },
+  reportReasonText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: theme.colors.textSecondary,
+  },
+  reportReasonTextActive: {
+    color: '#0F6F3A',
+  },
+  reportDetails: {
+    minHeight: 90,
+    textAlignVertical: 'top',
   },
   bulkFilesList: { marginTop: 10, maxHeight: 300 },
   bulkFilesListContent: { gap: 8 },

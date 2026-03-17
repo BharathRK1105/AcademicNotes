@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": [  
+    "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
@@ -19,6 +19,11 @@
     "plugins": [
       "expo-asset",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a62f01a1-734d-4129-bf57-adc9548caf34"
+      }
+    }
   }
 }

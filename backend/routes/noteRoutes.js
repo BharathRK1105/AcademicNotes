@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const Note = require('../models/Note');
+const NoteReport = require('../models/NoteReport');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -200,7 +201,8 @@ router.post('/bulk', upload.array('files', 10), async (req, res, next) => {
     const subject = req.body?.subject ? String(req.body.subject).trim() : '';
     const semester = req.body?.semester ? String(req.body.semester).trim() : '';
     const bulkTitleInput = req.body?.bulkTitle ? String(req.body.bulkTitle).trim() : '';
-    const bulkGroupId = files.length > 1 ? crypto.randomUUID() : '';
+    const requestedGroupId = req.body?.bulkGroupId ? String(req.body.bulkGroupId).trim() : '';
+    const bulkGroupId = requestedGroupId || (files.length > 1 ? crypto.randomUUID() : '');
     const bulkTitle = bulkGroupId ? bulkTitleInput || 'Bulk Upload Pack' : '';
     let titles = [];
     try {
@@ -335,6 +337,46 @@ router.get('/saved/me', async (req, res, next) => {
       .populate('userId', 'name email role')
       .sort({ createdAt: -1 });
     return res.status(200).json(notes.map((item) => enrichNote(item, req.user._id)));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/:id/report', async (req, res, next) => {
+  try {
+    const note = await Note.findById(req.params.id).populate('userId', 'name');
+    if (!note) {
+      return res.status(404).json({ message: 'Note not found' });
+    }
+    if (String(note.userId?._id || note.userId) === String(req.user._id)) {
+      return res.status(400).json({ message: 'You cannot report your own note' });
+    }
+
+    const rawReason = String(req.body?.reason || 'other').toLowerCase();
+    const allowedReasons = ['spam', 'copyright', 'inaccurate', 'inappropriate', 'other'];
+    const reason = allowedReasons.includes(rawReason) ? rawReason : 'other';
+    const details = String(req.body?.details || '').trim();
+
+    const existingReport = await NoteReport.findOne({
+      noteId: note._id,
+      reportedBy: req.user._id,
+      status: 'open',
+    });
+    if (existingReport) {
+      return res.status(409).json({ message: 'You have already reported this note.' });
+    }
+
+    const report = await NoteReport.create({
+      noteId: note._id,
+      reportedBy: req.user._id,
+      reason,
+      details,
+      noteTitle: note.title,
+      noteOwnerId: note.userId?._id || null,
+      noteOwnerName: note.userId?.name || '',
+    });
+
+    return res.status(201).json({ message: 'Report submitted.', reportId: report._id });
   } catch (error) {
     return next(error);
   }

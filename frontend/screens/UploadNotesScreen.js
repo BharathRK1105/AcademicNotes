@@ -14,6 +14,8 @@ import { theme } from '../theme';
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg'];
 const MAX_BULK_FILES = 10;
+const BULK_CHUNK_SIZE = 4;
+const MAX_BULK_TOTAL_MB = 25;
 
 const getDefaultTitleFromFileName = (fileName = '') => {
   const index = fileName.lastIndexOf('.');
@@ -22,6 +24,15 @@ const getDefaultTitleFromFileName = (fileName = '') => {
 };
 
 const getFileKey = (file) => `${file.uri || ''}|${file.name || ''}|${file.size || 0}`;
+const chunkFiles = (items, size) => {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+const createBulkGroupId = () => `bulk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const getTotalSizeMb = (items) => Math.round((items.reduce((sum, item) => sum + Number(item.size || 0), 0) / 1024 / 1024) * 10) / 10;
 
 export default function UploadNotesScreen({ navigation }) {
   const [title, setTitle] = useState('');
@@ -34,6 +45,7 @@ export default function UploadNotesScreen({ navigation }) {
   const [bulkTitle, setBulkTitle] = useState('');
   const [bulkTitles, setBulkTitles] = useState({});
   const [loading, setLoading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [notification, setNotification] = useState({ visible: false, message: '', type: 'info' });
 
   const showNotification = (message, type = 'info') => setNotification({ visible: true, message, type });
@@ -145,19 +157,40 @@ export default function UploadNotesScreen({ navigation }) {
     try {
       setLoading(true);
       if (bulkMode) {
-        const payload = {
-          description: description.trim(),
-          subject: `${department} - ${subject}`,
-          semester,
-          bulkTitle: bulkTitle.trim(),
-          files,
-          titles: files.map((item) => {
-            const key = getFileKey(item);
-            return String(bulkTitles[key] || getDefaultTitleFromFileName(item.name)).trim();
-          }),
-        };
-        const result = await notesService.createNotesBulk(payload);
-        showNotification(result.message || 'Bulk upload complete.', result.failedCount > 0 ? 'warning' : 'success');
+        const bulkGroupId = createBulkGroupId();
+        const totalSizeMb = getTotalSizeMb(files);
+        const shouldChunk = files.length > BULK_CHUNK_SIZE || totalSizeMb > MAX_BULK_TOTAL_MB;
+        const batches = shouldChunk ? chunkFiles(files, BULK_CHUNK_SIZE) : [files];
+        setBulkProgress({ current: 0, total: batches.length });
+        let uploadedCount = 0;
+        let failedCount = 0;
+        let failed = [];
+
+        for (let i = 0; i < batches.length; i += 1) {
+          const batch = batches[i];
+          setBulkProgress({ current: i + 1, total: batches.length });
+          const payload = {
+            description: description.trim(),
+            subject: `${department} - ${subject}`,
+            semester,
+            bulkTitle: bulkTitle.trim(),
+            bulkGroupId,
+            files: batch,
+            titles: batch.map((item) => {
+              const key = getFileKey(item);
+              return String(bulkTitles[key] || getDefaultTitleFromFileName(item.name)).trim();
+            }),
+          };
+          const result = await notesService.createNotesBulk(payload);
+          uploadedCount += Number(result.uploadedCount || 0);
+          failedCount += Number(result.failedCount || 0);
+          if (Array.isArray(result.failed)) {
+            failed = failed.concat(result.failed);
+          }
+        }
+
+        const message = `Bulk upload complete. Uploaded: ${uploadedCount}, Failed: ${failedCount}.`;
+        showNotification(message, failedCount > 0 ? 'warning' : 'success');
       } else {
         await notesService.createNote({
           title: title.trim(),
@@ -175,6 +208,7 @@ export default function UploadNotesScreen({ navigation }) {
       showNotification(getApiErrorMessage(error, 'Failed to upload note(s).'), 'error');
     } finally {
       setLoading(false);
+      setBulkProgress({ current: 0, total: 0 });
     }
   };
 
@@ -301,12 +335,19 @@ export default function UploadNotesScreen({ navigation }) {
             <TouchableOpacity style={styles.button} onPress={handleCreate} disabled={loading} activeOpacity={0.9}>
               {loading ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.buttonText}>{uploadLabel}</Text>}
             </TouchableOpacity>
+            {loading && bulkMode && bulkProgress.total > 1 ? (
+              <View style={styles.progressWrap}>
+                <Text style={styles.progressText}>
+                  Uploading batch {bulkProgress.current} of {bulkProgress.total}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.tipCard}>
             <Ionicons name="bulb-outline" size={18} color={theme.colors.accent} />
             <Text style={styles.tipText}>
-              Tip: Bulk mode allows up to {MAX_BULK_FILES} files. Duplicate files are automatically blocked.
+              Tip: Bulk mode allows up to {MAX_BULK_FILES} files. Large uploads are sent in small batches for stability.
             </Text>
           </View>
         </ScrollView>
@@ -454,4 +495,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tipText: { flex: 1, color: '#6A5533', fontSize: 12, fontWeight: '600' },
+  progressWrap: {
+    marginTop: 10,
+    borderRadius: 12,
+    backgroundColor: '#F3F7FF',
+    borderWidth: 1,
+    borderColor: '#D4E4F8',
+    padding: 10,
+  },
+  progressText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700' },
 });

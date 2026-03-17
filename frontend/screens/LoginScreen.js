@@ -40,6 +40,7 @@ export default function LoginScreen() {
     setPassword('');
   };
 
+
   const switchMode = (nextMode) => {
     setMode(nextMode);
     clearStudentFields();
@@ -112,6 +113,7 @@ export default function LoginScreen() {
     }
   };
 
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="dark" />
@@ -139,7 +141,6 @@ export default function LoginScreen() {
           />
         <Text style={styles.title}>Academic Notes</Text>
         <Text style={styles.subtitle}>Organize. Upload. Share.</Text>
-        {__DEV__ ? <Text style={styles.debugUrl}>API: {API_BASE_URL}</Text> : null}
 
           <Text style={styles.bgQuote}>
             {mode === 'student'
@@ -301,6 +302,7 @@ export default function LoginScreen() {
             type={notification.type}
             onHide={hideNotification}
           />
+
         </LinearGradient>
       </ImageBackground>
     </SafeAreaView>
@@ -362,12 +364,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     marginBottom: 16,
-    textAlign: 'center',
-  },
-  debugUrl: {
-    fontSize: 11,
-    color: '#7B6F5B',
-    marginBottom: 12,
     textAlign: 'center',
   },
   card: {

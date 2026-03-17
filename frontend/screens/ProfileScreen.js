@@ -70,6 +70,7 @@ export default function ProfileScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordPromptVisible, setPasswordPromptVisible] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   const showNotification = (message, type = 'info') => setNotification({ visible: true, message, type });
   const hideNotification = () => setNotification((prev) => ({ ...prev, visible: false }));
@@ -290,72 +291,119 @@ export default function ProfileScreen() {
                 <Text style={styles.valueSmall}>Last login: {formatDateTime(currentUser.lastLoginAt)}</Text>
                 <Text style={styles.valueSmall}>Auth provider: {currentUser.authProvider || 'N/A'}</Text>
                 {currentUser.authProvider === 'local' ? (
-                  <View style={styles.passwordWrap}>
-                    <View style={styles.passwordInputWrap}>
-                      <TextInput
-                        style={[styles.input, styles.passwordInput]}
-                        secureTextEntry={!showCurrentPassword}
-                        placeholder="Current password"
-                        value={passwordForm.currentPassword}
-                        onChangeText={(text) => setPasswordForm((prev) => ({ ...prev, currentPassword: text }))}
-                      />
-                      <TouchableOpacity onPress={() => setShowCurrentPassword((prev) => !prev)} style={styles.eyeBtn}>
-                        <Ionicons
-                          name={showCurrentPassword ? 'eye-off-outline' : 'eye-outline'}
-                          size={18}
-                          color={theme.colors.textSecondary}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.passwordInputWrap}>
-                      <TextInput
-                        style={[styles.input, styles.passwordInput]}
-                        secureTextEntry={!showNewPassword}
-                        placeholder="New password"
-                        value={passwordForm.newPassword}
-                        onChangeText={(text) => setPasswordForm((prev) => ({ ...prev, newPassword: text }))}
-                      />
-                      <TouchableOpacity onPress={() => setShowNewPassword((prev) => !prev)} style={styles.eyeBtn}>
-                        <Ionicons
-                          name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
-                          size={18}
-                          color={theme.colors.textSecondary}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.passwordInputWrap}>
-                      <TextInput
-                        style={[styles.input, styles.passwordInput]}
-                        secureTextEntry={!showConfirmPassword}
-                        placeholder="Confirm new password"
-                        value={passwordForm.confirmPassword}
-                        onChangeText={(text) => setPasswordForm((prev) => ({ ...prev, confirmPassword: text }))}
-                      />
-                      <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)} style={styles.eyeBtn}>
-                        <Ionicons
-                          name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                          size={18}
-                          color={theme.colors.textSecondary}
-                        />
-                      </TouchableOpacity>
+                  <>
+                    <View style={styles.securityCard}>
+                      <View style={styles.securityHeaderRow}>
+                        <Text style={styles.securityTitle}>Security</Text>
+                        <TouchableOpacity
+                          style={styles.ghostBtn}
+                          onPress={() => setShowPasswordForm((prev) => !prev)}
+                          activeOpacity={0.9}
+                        >
+                          <Ionicons name="lock-closed-outline" size={14} color={theme.colors.primary} />
+                          <Text style={styles.ghostBtnText}>{showPasswordForm ? 'Hide Form' : 'Change Password'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.securityHint}>Use 8+ characters with a mix of letters, numbers, and symbols.</Text>
+                      <View style={styles.securityIdeasRow}>
+                        <TouchableOpacity
+                          style={styles.securityIdea}
+                          onPress={() => showNotification('Two-factor authentication is coming soon.', 'info')}
+                        >
+                          <Ionicons name="shield-checkmark-outline" size={14} color={theme.colors.primary} />
+                          <Text style={styles.securityIdeaText}>Enable 2FA</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.securityIdea}
+                          onPress={() => showNotification('Login alerts are coming soon.', 'info')}
+                        >
+                          <Ionicons name="notifications-outline" size={14} color={theme.colors.primary} />
+                          <Text style={styles.securityIdeaText}>Login Alerts</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.securityIdea}
+                          onPress={() => showNotification('Session history is coming soon.', 'info')}
+                        >
+                          <Ionicons name="time-outline" size={14} color={theme.colors.primary} />
+                          <Text style={styles.securityIdeaText}>Session History</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
 
-                    <View style={styles.strengthRow}>
-                      <Text style={styles.strengthLabel}>Strength: </Text>
-                      <Text style={[styles.strengthValue, { color: passwordStrength.color }]}>{passwordStrength.label}</Text>
-                    </View>
-                    <View style={styles.strengthTrack}>
-                      <View style={[styles.strengthFill, { width: `${(passwordStrength.score / 5) * 100}%`, backgroundColor: passwordStrength.color }]} />
-                    </View>
+                    {showPasswordForm ? (
+                      <View style={styles.passwordWrap}>
+                        <View style={styles.passwordInputWrap}>
+                          <TextInput
+                            style={[styles.input, styles.passwordInput]}
+                            secureTextEntry={!showCurrentPassword}
+                            placeholder="Current password"
+                            value={passwordForm.currentPassword}
+                            onChangeText={(text) => setPasswordForm((prev) => ({ ...prev, currentPassword: text }))}
+                          />
+                          <TouchableOpacity onPress={() => setShowCurrentPassword((prev) => !prev)} style={styles.eyeBtn}>
+                            <Ionicons
+                              name={showCurrentPassword ? 'eye-off-outline' : 'eye-outline'}
+                              size={18}
+                              color={theme.colors.textSecondary}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.passwordInputWrap}>
+                          <TextInput
+                            style={[styles.input, styles.passwordInput]}
+                            secureTextEntry={!showNewPassword}
+                            placeholder="New password"
+                            value={passwordForm.newPassword}
+                            onChangeText={(text) => setPasswordForm((prev) => ({ ...prev, newPassword: text }))}
+                          />
+                          <TouchableOpacity onPress={() => setShowNewPassword((prev) => !prev)} style={styles.eyeBtn}>
+                            <Ionicons
+                              name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
+                              size={18}
+                              color={theme.colors.textSecondary}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.passwordInputWrap}>
+                          <TextInput
+                            style={[styles.input, styles.passwordInput]}
+                            secureTextEntry={!showConfirmPassword}
+                            placeholder="Confirm new password"
+                            value={passwordForm.confirmPassword}
+                            onChangeText={(text) => setPasswordForm((prev) => ({ ...prev, confirmPassword: text }))}
+                          />
+                          <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)} style={styles.eyeBtn}>
+                            <Ionicons
+                              name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                              size={18}
+                              color={theme.colors.textSecondary}
+                            />
+                          </TouchableOpacity>
+                        </View>
 
-                    <TouchableOpacity
-                      style={styles.primaryBtn}
-                      onPress={() => setPasswordPromptVisible(true)}
-                      activeOpacity={0.9}
-                    >
-                      <Text style={styles.primaryBtnText}>Change Password</Text>
-                    </TouchableOpacity>
-                  </View>
+                        <View style={styles.strengthRow}>
+                          <Text style={styles.strengthLabel}>Strength: </Text>
+                          <Text style={[styles.strengthValue, { color: passwordStrength.color }]}>{passwordStrength.label}</Text>
+                        </View>
+                        <View style={styles.strengthTrack}>
+                          <View
+                            style={[
+                              styles.strengthFill,
+                              { width: `${(passwordStrength.score / 5) * 100}%`, backgroundColor: passwordStrength.color },
+                            ]}
+                          />
+                        </View>
+
+                        <TouchableOpacity
+                          style={styles.primaryBtn}
+                          onPress={() => setPasswordPromptVisible(true)}
+                          activeOpacity={0.9}
+                        >
+                          <Text style={styles.primaryBtnText}>Update Password</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </>
                 ) : null}
               </View>
 
@@ -371,10 +419,7 @@ export default function ProfileScreen() {
                   >
                     <Text style={styles.chipText}>Review Hidden Notes</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.chip, styles.chipDisabled]}
-                    onPress={() => showNotification('Reported content workflow is coming soon.', 'info')}
-                  >
+                  <TouchableOpacity style={styles.chip} onPress={() => navigation.navigate('Dashboard', { panel: 'reports' })}>
                     <Text style={styles.chipText}>Reported Content</Text>
                   </TouchableOpacity>
                 </View>
@@ -604,6 +649,67 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: '#D4E4F8',
     paddingLeft: 8,
+  },
+  securityCard: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#F7F9FB',
+    borderWidth: 1,
+    borderColor: '#DCE5F0',
+  },
+  securityHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  securityTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.textPrimary,
+  },
+  ghostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D4E4F8',
+    backgroundColor: '#EFF6FF',
+  },
+  ghostBtnText: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  securityHint: {
+    marginTop: 6,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+  },
+  securityIdeasRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  securityIdea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D4E4F8',
+    backgroundColor: '#EEF5FF',
+  },
+  securityIdeaText: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+    fontSize: 11,
   },
   passwordWrap: { marginTop: 8, gap: 8 },
   passwordInputWrap: {

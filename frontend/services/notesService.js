@@ -123,6 +123,9 @@ export const notesService = {
     if (payload.bulkTitle) {
       formData.append('bulkTitle', payload.bulkTitle);
     }
+    if (payload.bulkGroupId) {
+      formData.append('bulkGroupId', payload.bulkGroupId);
+    }
     formData.append('titles', JSON.stringify(payload.titles || []));
 
     for (const file of payload.files || []) {
@@ -175,6 +178,11 @@ export const notesService = {
 
   async toggleSaveNote(noteId) {
     const response = await api.patch(`/notes/${noteId}/save`);
+    return response.data;
+  },
+
+  async reportNote(noteId, payload = {}) {
+    const response = await api.post(`/notes/${noteId}/report`, payload);
     return response.data;
   },
 

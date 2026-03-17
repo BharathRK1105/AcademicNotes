@@ -47,6 +47,7 @@ function ProtectedStudentDashboard() {
 export default function AppNavigator() {
   const { isLoading, isAuthenticated } = useAuth();
 
+
   if (isLoading) {
     return <FullLoader />;
   }

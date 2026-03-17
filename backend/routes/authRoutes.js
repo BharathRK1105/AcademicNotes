@@ -46,6 +46,7 @@ const sanitizeUser = (user) => ({
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+
 const buildBaseUsernameFromEmail = (email) => {
   const localPart = String(email || '')
     .split('@')[0]
@@ -285,6 +286,7 @@ router.post('/login', async (req, res, next) => {
     return next(error);
   }
 });
+
 
 router.get('/me', authMiddleware, async (req, res) => {
   res.status(200).json({

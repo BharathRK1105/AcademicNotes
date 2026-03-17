@@ -20,4 +20,14 @@ export const adminService = {
     const response = await api.get('/admin/profile/insights');
     return response.data;
   },
+
+  async getReports(status) {
+    const response = await api.get('/admin/reports', { params: status ? { status } : {} });
+    return response.data;
+  },
+
+  async resolveReport(reportId, action = 'dismiss') {
+    const response = await api.patch(`/admin/reports/${reportId}/resolve`, { action });
+    return response.data;
+  },
 };

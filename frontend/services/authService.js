@@ -45,6 +45,7 @@ export const authService = {
     return response.data;
   },
 
+
   async getStoredToken() {
     return tokenStorage.getToken();
   },

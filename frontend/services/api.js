@@ -38,7 +38,7 @@ let unauthorizedHandler = null;
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
 });
 
 api.interceptors.request.use(async (config) => {
@@ -66,6 +66,9 @@ export function setUnauthorizedHandler(handler) {
 export function getApiErrorMessage(error, fallback = 'Something went wrong. Please try again.') {
   if (error?.code === 'ECONNABORTED') {
     return 'Request timed out. Make sure the backend is running and the API URL is reachable.';
+  }
+  if (error?.message === 'Network Error' || !error?.response) {
+    return 'Network error. The server may be waking up or unreachable. Please try again in a moment.';
   }
   return error?.response?.data?.message || error?.message || fallback;
 }

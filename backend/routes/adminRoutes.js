@@ -40,6 +40,7 @@ router.get('/profile/insights', async (req, res, next) => {
       unblockedUsers: allActions.filter((item) => item.actionType === 'unblock_user').length,
       notesHiddenByAdmin: allActions.filter((item) => item.actionType === 'hide_note').length,
       notesUnhiddenByAdmin: allActions.filter((item) => item.actionType === 'unhide_note').length,
+      autoHiddenNotes: notes.filter((item) => item.autoHiddenByReports).length,
       deletionsDone: allActions.filter((item) => item.actionType === 'delete_note' || item.actionType === 'delete_user').length,
       reportedContent: openReports || 0,
     };
@@ -60,12 +61,17 @@ router.get('/reports', async (req, res, next) => {
     const reports = await NoteReport.find(filter)
       .populate({
         path: 'noteId',
-        select: 'title subject semester fileName isHidden userId',
+        select: 'title subject semester fileName isHidden autoHiddenByReports userId',
         populate: { path: 'userId', select: 'name email' },
       })
       .populate('reportedBy', 'name email role')
       .sort({ createdAt: -1 });
-    return res.status(200).json(reports);
+    const staleReports = reports.filter((item) => !item.noteId);
+    const freshReports = reports.filter((item) => item.noteId);
+    if (staleReports.length > 0) {
+      await NoteReport.deleteMany({ _id: { $in: staleReports.map((item) => item._id) } });
+    }
+    return res.status(200).json(freshReports);
   } catch (error) {
     return next(error);
   }
@@ -96,6 +102,7 @@ router.patch('/reports/:id/resolve', async (req, res, next) => {
       if (action === 'hide') {
         note.isHidden = true;
         note.hiddenBy = 'admin';
+        note.autoHiddenByReports = false;
         await note.save();
         actionTaken = 'hidden';
         await logAdminAction({
@@ -112,6 +119,7 @@ router.patch('/reports/:id/resolve', async (req, res, next) => {
           fs.unlinkSync(note.filePath);
         }
         await note.deleteOne();
+        const deletedReports = await NoteReport.deleteMany({ noteId: note._id });
         actionTaken = 'deleted';
         await logAdminAction({
           adminId: req.user._id,
@@ -119,6 +127,10 @@ router.patch('/reports/:id/resolve', async (req, res, next) => {
           targetType: 'note',
           targetId: note._id,
           targetLabel: note.title,
+        });
+        return res.status(200).json({
+          report,
+          linkedReportsRemoved: deletedReports?.deletedCount || 0,
         });
       }
     }
@@ -128,6 +140,29 @@ router.patch('/reports/:id/resolve', async (req, res, next) => {
     report.resolvedAt = new Date();
     report.resolvedBy = req.user._id;
     await report.save();
+
+    if (action === 'dismiss') {
+      const noteId = report.noteId?._id || report.noteId;
+      if (noteId) {
+        const [note, openReports] = await Promise.all([
+          Note.findById(noteId),
+          NoteReport.countDocuments({ noteId, status: 'open' }),
+        ]);
+        if (note && note.autoHiddenByReports && note.isHidden && openReports < 3) {
+          note.isHidden = false;
+          note.hiddenBy = null;
+          note.autoHiddenByReports = false;
+          await note.save();
+          await logAdminAction({
+            adminId: req.user._id,
+            actionType: 'auto_unhide_note',
+            targetType: 'note',
+            targetId: note._id,
+            targetLabel: note.title,
+          });
+        }
+      }
+    }
 
     return res.status(200).json(report);
   } catch (error) {
@@ -214,6 +249,7 @@ router.patch('/notes/:id/visibility', async (req, res, next) => {
     const nextHiddenState = Boolean(req.body?.isHidden);
     note.isHidden = nextHiddenState;
     note.hiddenBy = nextHiddenState ? 'admin' : null;
+    note.autoHiddenByReports = false;
     await note.save();
     await logAdminAction({
       adminId: req.user._id,
@@ -238,6 +274,7 @@ router.delete('/notes/:id', async (req, res, next) => {
       fs.unlinkSync(note.filePath);
     }
     await note.deleteOne();
+    const deletedReports = await NoteReport.deleteMany({ noteId: note._id });
     await logAdminAction({
       adminId: req.user._id,
       actionType: 'delete_note',
@@ -245,7 +282,10 @@ router.delete('/notes/:id', async (req, res, next) => {
       targetId: note._id,
       targetLabel: note.title,
     });
-    return res.status(200).json({ message: 'Note deleted by admin' });
+    return res.status(200).json({
+      message: 'Note deleted by admin',
+      linkedReportsRemoved: deletedReports?.deletedCount || 0,
+    });
   } catch (error) {
     return next(error);
   }

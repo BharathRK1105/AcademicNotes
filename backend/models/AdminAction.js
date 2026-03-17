@@ -10,7 +10,16 @@ const adminActionSchema = new mongoose.Schema(
     },
     actionType: {
       type: String,
-      enum: ['block_user', 'unblock_user', 'hide_note', 'unhide_note', 'delete_user', 'delete_note'],
+      enum: [
+        'block_user',
+        'unblock_user',
+        'hide_note',
+        'unhide_note',
+        'delete_user',
+        'delete_note',
+        'auto_hide_note',
+        'auto_unhide_note',
+      ],
       required: true,
       index: true,
     },

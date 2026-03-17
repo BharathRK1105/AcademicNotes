@@ -89,6 +89,7 @@ function AdminDashboardContent({ route }) {
       activeUsers: users.filter((item) => !item.isBlocked).length,
       totalNotes: notes.length,
       openReports: reports.filter((item) => item.status === 'open').length,
+      autoHiddenNotes: notes.filter((item) => item.autoHiddenByReports).length,
     }),
     [notes.length, reports, users]
   );
@@ -317,14 +318,19 @@ function AdminDashboardContent({ route }) {
   const handleResolveReport = async () => {
     if (!reportAction?.report || !reportAction?.action) return;
     try {
-      await adminService.resolveReport(reportAction.report._id, reportAction.action);
-      const label =
+      const response = await adminService.resolveReport(reportAction.report._id, reportAction.action);
+      const removedCount = response?.linkedReportsRemoved || 0;
+      const baseLabel =
         reportAction.action === 'hide'
           ? 'Report resolved. Note hidden.'
           : reportAction.action === 'delete'
           ? 'Report resolved. Note deleted.'
           : 'Report dismissed.';
-      showNotification(label, reportAction.action === 'dismiss' ? 'info' : 'success');
+      const extra =
+        reportAction.action === 'delete' && removedCount > 0
+          ? ` ${removedCount} linked report(s) removed.`
+          : '';
+      showNotification(`${baseLabel}${extra}`, reportAction.action === 'dismiss' ? 'info' : 'success');
       setReportAction(null);
       await loadData();
     } catch (error) {
@@ -467,13 +473,26 @@ function AdminDashboardContent({ route }) {
     const statusLabel = item.status === 'open' ? 'Open' : item.status === 'dismissed' ? 'Dismissed' : 'Resolved';
     const canAct = item.status === 'open';
     const noteHidden = Boolean(note?.isHidden);
+    const autoHidden = Boolean(note?.autoHiddenByReports);
 
     return (
       <View style={styles.card}>
         <View style={styles.reportHeader}>
           <Text style={styles.title}>{noteTitle}</Text>
-          <View style={[styles.reportStatus, item.status === 'open' ? styles.reportOpen : item.status === 'dismissed' ? styles.reportDismissed : styles.reportResolved]}>
-            <Text style={styles.reportStatusText}>{statusLabel}</Text>
+          <View style={styles.reportHeaderBadges}>
+            {autoHidden ? (
+              <View style={[styles.reportStatus, styles.reportAuto]}>
+                <Text style={styles.reportStatusText}>Auto-Hidden</Text>
+              </View>
+            ) : null}
+            <View
+              style={[
+                styles.reportStatus,
+                item.status === 'open' ? styles.reportOpen : item.status === 'dismissed' ? styles.reportDismissed : styles.reportResolved,
+              ]}
+            >
+              <Text style={styles.reportStatusText}>{statusLabel}</Text>
+            </View>
           </View>
         </View>
         <Text style={styles.meta}>Reported by: {reporter?.name || 'Unknown'} ({reporter?.email || 'N/A'})</Text>
@@ -561,6 +580,18 @@ function AdminDashboardContent({ route }) {
           <SummaryCard label="Notes" value={summary.totalNotes} icon="albums-outline" />
           <SummaryCard label="Reports" value={summary.openReports} icon="flag-outline" />
         </View>
+
+        {summary.autoHiddenNotes > 0 ? (
+          <View style={styles.autoHiddenNotice}>
+            <Ionicons name="warning-outline" size={16} color="#8C6A2D" />
+            <Text style={styles.autoHiddenText}>
+              {summary.autoHiddenNotes} note(s) auto-hidden after multiple reports.
+            </Text>
+            <TouchableOpacity style={styles.autoHiddenBtn} onPress={() => setActivePanel('reports')} activeOpacity={0.9}>
+              <Text style={styles.autoHiddenBtnText}>Review</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={styles.segmentRow}>
           <TouchableOpacity
@@ -1022,6 +1053,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  reportHeaderBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   reportStatus: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1032,11 +1068,42 @@ const styles = StyleSheet.create({
   reportOpen: { backgroundColor: '#EAF3FF', borderColor: '#BBD4F1' },
   reportResolved: { backgroundColor: '#EAF9EF', borderColor: '#A9DDBB' },
   reportDismissed: { backgroundColor: '#F4F6F9', borderColor: '#D9DFE7' },
+  reportAuto: { backgroundColor: '#FFF7E8', borderColor: '#E6C68A' },
   reportActions: {
     marginTop: 10,
     flexDirection: 'row',
     gap: 8,
     flexWrap: 'wrap',
+  },
+  autoHiddenNotice: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E6C68A',
+    backgroundColor: '#FFF7E8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  autoHiddenText: {
+    flex: 1,
+    color: '#8C6A2D',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  autoHiddenBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#8C6A2D',
+  },
+  autoHiddenBtnText: {
+    color: theme.colors.white,
+    fontSize: 11,
+    fontWeight: '800',
   },
   reportNoteMeta: {
     marginTop: 6,

@@ -804,6 +804,55 @@ export default function StudentDashboardScreen({ navigation }) {
                     <Text style={styles.bulkFileMeta} numberOfLines={1}>
                       {fileItem.fileName}
                     </Text>
+                    <Text style={styles.bulkFileMeta} numberOfLines={1}>
+                      Uploaded by: {fileItem.userId?.name || fileItem.uploadedBy || 'Unknown'}
+                    </Text>
+                  </View>
+                  <View style={styles.bulkFileActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.bulkActionBtn,
+                        fileItem.isSavedByMe && styles.bulkActionSaved,
+                        fileItem.isHidden && styles.bulkActionBtnDisabled,
+                      ]}
+                      onPress={() => handleToggleBookmark(fileItem)}
+                      disabled={fileItem.isHidden}
+                      accessibilityLabel="Save"
+                      title="Save"
+                      activeOpacity={0.9}
+                    >
+                      <Ionicons
+                        name={fileItem.isSavedByMe ? 'bookmark' : 'bookmark-outline'}
+                        size={14}
+                        color={fileItem.isSavedByMe ? '#0F6F3A' : theme.colors.white}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.bulkActionBtn, fileItem.isHidden && styles.bulkActionBtnDisabled]}
+                      onPress={() => handleRatePress(fileItem)}
+                      disabled={fileItem.isHidden}
+                      accessibilityLabel="Rate"
+                      title="Rate"
+                      activeOpacity={0.9}
+                    >
+                      <Ionicons name="star-outline" size={14} color={theme.colors.white} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.bulkActionBtn, fileItem.isHidden && styles.bulkActionBtnDisabled]}
+                      onPress={() => handleReportPress(fileItem)}
+                      disabled={fileItem.isHidden}
+                      accessibilityLabel="Report"
+                      title="Report"
+                      activeOpacity={0.9}
+                    >
+                      <Ionicons name="flag-outline" size={14} color={theme.colors.white} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.bulkRatingPill}>
+                    <Ionicons name="star" size={12} color="#D97706" />
+                    <Text style={styles.bulkRatingText}>
+                      {Number(fileItem.averageRating || 0).toFixed(1)} ({fileItem.ratingsCount || 0})
+                    </Text>
                   </View>
                   {fileItem?.isHidden && (isAdmin || isOwnerOfFile(fileItem)) ? (
                     <View style={styles.bulkHiddenBadge}>
@@ -1283,6 +1332,45 @@ const styles = StyleSheet.create({
   bulkFileTextWrap: { flex: 1, paddingRight: 8 },
   bulkFileTitle: { color: theme.colors.textPrimary, fontWeight: '800', fontSize: 13 },
   bulkFileMeta: { marginTop: 2, color: theme.colors.textSecondary, fontSize: 11 },
+  bulkFileActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginRight: 8,
+  },
+  bulkActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bulkActionBtnDisabled: {
+    opacity: 0.5,
+  },
+  bulkActionSaved: {
+    backgroundColor: '#EAF9EF',
+    borderWidth: 1,
+    borderColor: '#A9DDBB',
+  },
+  bulkRatingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFF5DD',
+    borderColor: '#F4D18A',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 8,
+  },
+  bulkRatingText: {
+    fontSize: 11,
+    color: '#8A5A00',
+    fontWeight: '800',
+  },
   bulkHiddenBadge: {
     width: 28,
     height: 28,

@@ -72,6 +72,11 @@ const noteSchema = new mongoose.Schema(
       enum: ['owner', 'admin', null],
       default: null,
     },
+    autoHiddenByReports: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     ratings: [
       {
         userId: {

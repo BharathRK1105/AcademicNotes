@@ -42,6 +42,8 @@ const actionMeta = {
   unblock_user: 'Unblocked user',
   hide_note: 'Hidden note',
   unhide_note: 'Unhid note',
+  auto_hide_note: 'Auto-hidden note',
+  auto_unhide_note: 'Auto-unhid note',
   delete_user: 'Deleted user',
   delete_note: 'Deleted note',
 };

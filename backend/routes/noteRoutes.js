@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const Note = require('../models/Note');
 const NoteReport = require('../models/NoteReport');
+const AdminAction = require('../models/AdminAction');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -131,6 +132,16 @@ const enrichNote = (noteDoc, currentUserId) => {
     trustTier,
     canOwnerUnhide: !(note.isHidden && note.hiddenBy === 'admin' && String(note.userId) === String(currentUserId)),
   };
+};
+
+const logAdminAction = async ({ adminId, actionType, targetType, targetId, targetLabel }) => {
+  await AdminAction.create({
+    adminId,
+    actionType,
+    targetType,
+    targetId,
+    targetLabel: targetLabel || '',
+  });
 };
 
 router.post('/', upload.single('file'), async (req, res, next) => {
@@ -376,7 +387,22 @@ router.post('/:id/report', async (req, res, next) => {
       noteOwnerName: note.userId?.name || '',
     });
 
-    return res.status(201).json({ message: 'Report submitted.', reportId: report._id });
+    const openReports = await NoteReport.countDocuments({ noteId: note._id, status: 'open' });
+    let autoHidden = false;
+    if (openReports >= 3 && !note.isHidden) {
+      note.isHidden = true;
+      note.hiddenBy = 'admin';
+      note.autoHiddenByReports = true;
+      await note.save();
+      autoHidden = true;
+    }
+
+    return res.status(201).json({
+      message: autoHidden ? 'Report submitted. Note auto-hidden after multiple reports.' : 'Report submitted.',
+      reportId: report._id,
+      autoHidden,
+      openReports,
+    });
   } catch (error) {
     return next(error);
   }
@@ -563,6 +589,7 @@ router.delete('/:id', async (req, res, next) => {
       fs.unlinkSync(note.filePath);
     }
     await note.deleteOne();
+    await NoteReport.deleteMany({ noteId: note._id });
     return res.status(200).json({ message: 'Note deleted' });
   } catch (error) {
     return next(error);
